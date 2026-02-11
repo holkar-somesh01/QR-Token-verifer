@@ -24,12 +24,15 @@ export default function LoginPage() {
         });
 
         if (res?.error) {
+            console.error("Login Result Error:", res.error);
             setError("Invalid ID or Password");
             setLoading(false);
         } else {
-            router.push("/");
-            router.refresh();
+            console.log("Login Result Success, redirecting...");
+            // Force a hard refresh/navigation if push is slow
+            window.location.href = "/";
         }
+
     };
 
     return (
