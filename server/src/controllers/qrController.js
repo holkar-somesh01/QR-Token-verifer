@@ -310,6 +310,31 @@ exports.getStats = async (req, res) => {
     }
 };
 
+// Fetch Full Scan History
+exports.getScanHistory = async (req, res) => {
+    try {
+        const history = await db.select({
+            scanId: qrScans.id,
+            scannedAt: qrScans.scannedAt,
+            scannedBy: qrScans.scannedBy,
+            userName: users.fullName,
+            studentId: users.studentId,
+            userClass: users.class,
+            ipAddress: qrScans.ipAddress,
+            deviceInfo: qrScans.deviceInfo
+        })
+            .from(qrScans)
+            .leftJoin(users, eq(qrScans.userId, users.id))
+            .orderBy(desc(qrScans.scannedAt));
+
+        res.json(history);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
 // Download specific QRs as ZIP
 exports.downloadQRs = async (req, res) => {
     try {

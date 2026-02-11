@@ -26,7 +26,11 @@ export default function Navbar() {
                         <Link href="/users" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
                             Users
                         </Link>
+                        <Link href="/attendance" className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
+                            Attendance
+                        </Link>
                     </div>
+
                 </div>
 
                 <div className="hidden md:flex items-center gap-6">
@@ -74,7 +78,11 @@ export default function Navbar() {
                         <Link href="/users" className="block rounded-md px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900">
                             Users
                         </Link>
+                        <Link href="/attendance" className="block rounded-md px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900">
+                            Attendance
+                        </Link>
                     </div>
+
                     <div className="border-t border-gray-100 pt-2">
                         <button
                             onClick={() => signOut()}

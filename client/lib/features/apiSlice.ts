@@ -101,6 +101,10 @@ export const apiSlice = createApi({
                 body,
             }),
         }),
+        getScanHistory: builder.query<any, void>({
+            query: () => '/qr/history',
+            providesTags: ['Stats'],
+        }),
     }),
 })
 
@@ -114,5 +118,7 @@ export const {
     useImportUsersMutation,
     useGenerateQRsMutation,
     useScanTokenMutation,
-    useSendQRViaEmailMutation
+    useSendQRViaEmailMutation,
+    useGetScanHistoryQuery
 } = apiSlice
+

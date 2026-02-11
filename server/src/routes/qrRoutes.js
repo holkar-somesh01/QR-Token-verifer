@@ -21,6 +21,10 @@ router.post('/download', verifyToken, qrController.downloadQRs);
 // Dashboard Stats (Protected)
 router.get('/stats', verifyToken, qrController.getStats);
 
+// Scan History (Protected)
+router.get('/history', verifyToken, qrController.getScanHistory);
+
+
 // List Users (Protected)
 router.get('/users', verifyToken, qrController.getAllUsers);
 
