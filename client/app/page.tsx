@@ -2,7 +2,7 @@
 import { useSession } from "next-auth/react";
 import Scanner from "@/components/Scanner";
 import Navbar from "@/components/Navbar";
-import { Loader2, RefreshCw, Smartphone, TrendingUp, Users, Clock, CheckCircle, BarChart3 } from "lucide-react";
+import { Loader2, RefreshCw, Smartphone, TrendingUp, Users, Clock, CheckCircle, BarChart3, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useGetStatsQuery } from "@/lib/features/apiSlice";
 import Link from "next/link"; // Import Link
@@ -43,149 +43,186 @@ export default function Home() {
   const progress = stats && stats.total > 0 ? (stats.scannedCount / stats.total) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
       <Navbar />
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 space-y-10">
+        {/* Command Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-200 pb-10">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
-            <p className="mt-1 text-sm text-gray-500">Real-time overview of event attendance.</p>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse"></span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-600">Operations Control</span>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Scan <span className="text-slate-400">Command</span></h1>
+            <p className="mt-2 text-slate-500 font-medium">Real-time surveillance of authentication event metrics.</p>
           </div>
+
           <div className="flex items-center gap-3">
-            <Link href="/users" className="hidden sm:inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-medium transition-all bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">
-              <Users className="mr-2 h-4 w-4" />
-              Manage Users
+            <Link href="/users" className="hidden sm:inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold transition-all bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm">
+              <Users className="mr-2 h-4 w-4 text-slate-400" />
+              Manage Fleet
             </Link>
             <button
               onClick={handleRefresh}
-              className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm"
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold transition-all bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm"
             >
-              <RefreshCw className={`mr-2 h-4 w-4 ${statsLoading ? 'animate-spin' : ''}`} />
-              Refresh
+              <RefreshCw className={`mr-2 h-4 w-4 text-slate-400 ${statsLoading ? 'animate-spin' : ''}`} />
+              Sync Data
             </button>
             <button
               onClick={() => setShowScanner(!showScanner)}
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200"
+              className="inline-flex items-center justify-center px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md shadow-blue-100 bg-slate-900 text-white hover:bg-slate-800 active:scale-95"
             >
-              <Smartphone className="mr-2 h-4 w-4" />
-              {showScanner ? 'Close Scanner' : 'Launch Scanner'}
+              <Smartphone className="mr-2 h-4 w-4 opacity-70" />
+              {showScanner ? 'Deactivate Scanner' : 'Activate Scanner'}
             </button>
           </div>
         </div>
 
-        {/* Scanner Expansion */}
+        {/* Scanner Modal Pop-up */}
         {showScanner && (
-          <div className="animate-in slide-in-from-top-4 duration-500 ease-out">
-            <div className="relative z-10 mx-auto max-w-2xl transform transition-all">
-              <Scanner />
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-500"
+              onClick={() => setShowScanner(false)}
+            />
+
+            {/* Modal Content */}
+            <div className="relative w-full max-w-xl bg-white rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-12 duration-500 ease-out border border-white/20 max-h-[90vh] flex flex-col">
+              {/* Header with Close Button */}
+              <div className="absolute top-4 right-4 z-[110]">
+                <button
+                  onClick={() => setShowScanner(false)}
+                  className="h-10 w-10 rounded-full bg-slate-900/50 hover:bg-slate-900/80 text-white flex items-center justify-center transition-all active:scale-90 backdrop-blur-md border border-white/10"
+                >
+                  <XCircle size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <Scanner />
+              </div>
             </div>
           </div>
         )}
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Main Progress Card */}
-          <div className="col-span-1 md:col-span-2 bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col justify-between relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-              <CheckCircle size={140} />
+        {/* Executive Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Progress Overview */}
+          <div className="col-span-1 md:col-span-2 official-card p-8 flex flex-col justify-between relative overflow-hidden group border-l-4 border-l-blue-600 bg-white">
+            <div className="absolute top-0 right-0 p-10 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
+              <CheckCircle size={180} />
             </div>
 
             <div className="relative z-10">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg w-fit text-green-700">
-                  <TrendingUp size={16} />
-                  <span className="text-xs font-bold uppercase tracking-wider">Live Check-in Rate</span>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg w-fit text-blue-700 border border-blue-100">
+                  <TrendingUp size={14} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Entry Saturation</span>
                 </div>
               </div>
 
-              <h3 className="text-5xl font-extrabold text-gray-900 tracking-tight mt-2">
-                {stats?.scannedCount || 0}
-                <span className="text-2xl text-gray-400 font-medium ml-2">/ {stats?.total || 0}</span>
-              </h3>
-              <p className="text-gray-500 mt-1 font-medium">Total Checked In</p>
+              <div className="flex items-baseline gap-3">
+                <h3 className="text-5xl font-bold text-slate-900 tracking-tighter">
+                  {stats?.scannedCount || 0}
+                </h3>
+                <span className="text-xl text-slate-300 font-bold tracking-tight">/ {stats?.total || 0} UNITS</span>
+              </div>
+              <p className="text-slate-500 mt-2 font-semibold uppercase text-xs tracking-widest">Total Verified Attendance</p>
             </div>
 
-            <div className="mt-8 relative z-10">
-              <div className="flex justify-between text-sm font-semibold text-gray-600 mb-2">
-                <span>Progress</span>
+            <div className="mt-12 relative z-10">
+              <div className="flex justify-between text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
+                <span>System Fill Rate</span>
                 <span className="text-blue-600">{progress.toFixed(1)}%</span>
               </div>
-              <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-600 rounded-full transition-all duration-1000 ease-out" style={{ width: `${progress}%` }}></div>
+              <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden p-1">
+                <div className="h-full bg-blue-600 rounded-full transition-all duration-1000 ease-out shadow-[0_0_12px_rgba(37,99,235,0.4)]" style={{ width: `${progress}%` }}></div>
               </div>
             </div>
           </div>
 
-          {/* Secondary Stats */}
+          {/* Quick Metrics */}
           <div className="space-y-6">
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow">
-              <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+            <div className="official-card p-6 flex items-center gap-5 hover:translate-x-1 group bg-white">
+              <div className="h-12 w-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-all">
                 <Users size={24} />
               </div>
               <div>
-                <p className="text-sm text-gray-500 font-medium">Total Registered</p>
-                <p className="text-2xl font-bold text-gray-900">{stats?.total || 0}</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Database Population</p>
+                <p className="text-2xl font-bold text-slate-900 tracking-tighter">{stats?.total || 0}</p>
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow">
-              <div className="h-12 w-12 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600">
+            <div className="official-card p-6 flex items-center gap-5 hover:translate-x-1 group bg-white">
+              <div className="h-12 w-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 border border-slate-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
                 <BarChart3 size={24} />
               </div>
               <div>
-                <p className="text-sm text-gray-500 font-medium">Generated QRs</p>
-                <p className="text-2xl font-bold text-gray-900">{stats?.qrs || 0}</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Coded Token Assets</p>
+                <p className="text-2xl font-bold text-slate-900 tracking-tighter">{stats?.qrs || 0}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Recent Activity Table */}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
-            <Link href="/users" className="text-sm text-blue-600 font-medium hover:text-blue-700">View Users</Link>
+        {/* Activity Ledger */}
+        <div className="official-card overflow-hidden bg-white shadow-xl shadow-slate-200/50 border-slate-100">
+          <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 tracking-tight">Activity Ledger</h3>
+              <p className="text-xs text-slate-400 font-medium">Most recent authentication events across the network.</p>
+            </div>
+            <Link href="/attendance" className="inline-flex items-center px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border border-slate-200">
+              View Full Logs
+            </Link>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto custom-scrollbar">
             {(!stats?.recent || stats.recent.length === 0) ? (
-              <div className="p-12 text-center text-gray-400 flex flex-col items-center">
-                <div className="h-16 w-16 bg-gray-50 rounded-full flex items-center justify-center mb-3">
-                  <Clock size={24} className="opacity-50" />
+              <div className="p-24 text-center text-slate-300 flex flex-col items-center">
+                <div className="h-16 w-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4 border border-slate-100">
+                  <Clock size={24} className="text-slate-200" />
                 </div>
-                <p>No recent activity</p>
+                <p className="font-bold text-slate-900">Ledger Standby</p>
+                <p className="text-xs text-slate-400 mt-1">Listening for incoming authentication telemetry...</p>
               </div>
             ) : (
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
-                  <tr className="border-b border-gray-50 text-xs text-gray-500 uppercase tracking-wider">
-                    <th className="px-6 py-4 font-semibold">Guest</th>
-                    <th className="px-6 py-4 font-semibold">ID</th>
-                    <th className="px-6 py-4 font-semibold">Time</th>
-                    <th className="px-6 py-4 font-semibold text-right">Status</th>
+                  <tr className="border-b border-slate-100 text-[10px] text-slate-400 uppercase tracking-[0.2em] bg-slate-50/30">
+                    <th className="px-8 py-5 font-bold">Authorized Entity</th>
+                    <th className="px-8 py-5 font-bold">Identifier</th>
+                    <th className="px-8 py-5 font-bold">Verification Time</th>
+                    <th className="px-8 py-5 text-right font-bold">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-slate-50">
                   {stats.recent.map((log: any, i: number) => (
-                    <tr key={i} className="hover:bg-gray-50/50 transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-blue-100 to-indigo-100 flex items-center justify-center text-blue-600 text-xs font-bold">
+                    <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className="h-10 w-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold shadow-sm group-hover:bg-slate-900 group-hover:text-white transition-all overflow-hidden relative">
                             {log.name.charAt(0)}
+                            <div className="absolute inset-0 bg-gradient-to-tr from-slate-200 to-transparent opacity-20"></div>
                           </div>
-                          <span className="font-semibold text-gray-900">{log.name}</span>
+                          <span className="font-bold text-slate-900 tracking-tight">{log.name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-500 font-mono text-xs">{log.id}</td>
-                      <td className="px-6 py-4 text-gray-500 text-sm">
-                        {new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <td className="px-8 py-6 font-bold text-[11px] uppercase tracking-widest font-mono text-slate-400">{log.id}</td>
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-2">
+                          <Clock size={12} className="text-blue-500" />
+                          <span className="text-sm font-semibold text-slate-700">
+                            {new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700">
-                          <span className="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                          Checked In
+                      <td className="px-8 py-6 text-right">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100">
+                          Verified
                         </span>
                       </td>
                     </tr>
@@ -197,5 +234,7 @@ export default function Home() {
         </div>
       </main>
     </div>
+
   );
+
 }

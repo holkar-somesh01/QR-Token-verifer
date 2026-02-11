@@ -22,7 +22,9 @@ router.post('/download', verifyToken, qrController.downloadQRs);
 router.get('/stats', verifyToken, qrController.getStats);
 
 // Scan History (Protected)
+// Scan History (Protected)
 router.get('/history', verifyToken, qrController.getScanHistory);
+router.delete('/history/:id', verifyToken, qrController.deleteScanRecord);
 
 
 // List Users (Protected)

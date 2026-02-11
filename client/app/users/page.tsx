@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
 import { useGetUsersQuery, useImportUsersMutation, useGenerateQRsMutation, useSendQRViaEmailMutation } from '@/lib/features/apiSlice';
 import { useSession } from 'next-auth/react';
-import { Loader2, Upload, QrCode, Download, Search, CheckCircle, XCircle, FileSpreadsheet, RefreshCw, Mail, MessageSquare, ExternalLink, LayoutGrid, Table as TableIcon, MoreVertical } from 'lucide-react';
+import { Loader2, Upload, QrCode, Download, Search, CheckCircle, XCircle, FileSpreadsheet, RefreshCw, Mail, MessageSquare, ExternalLink, LayoutGrid, Table as TableIcon, MoreVertical, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import Image from 'next/image';
 
 export default function UsersPage() {
@@ -20,6 +20,10 @@ export default function UsersPage() {
     const [file, setFile] = useState<File | null>(null);
     const [sendingId, setSendingId] = useState<string | null>(null);
 
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(12);
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'fullName', direction: 'asc' });
+
     // Default to grid on mobile
     useEffect(() => {
         if (typeof window !== 'undefined' && window.innerWidth < 768) {
@@ -27,11 +31,41 @@ export default function UsersPage() {
         }
     }, []);
 
-    // Filter users
-    const filteredUsers = users?.filter((user: any) =>
-        user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.studentId.toLowerCase().includes(searchTerm.toLowerCase())
-    ) || [];
+    // Process users: filter and sort
+    const processedUsers = useMemo(() => {
+        if (!users) return [];
+
+        let filtered = users.filter((user: any) =>
+            user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.studentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (user.class && user.class.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+
+        // Sorting
+        const sorted = [...filtered].sort((a, b) => {
+            const valA = (a[sortConfig.key] || '').toString().toLowerCase();
+            const valB = (b[sortConfig.key] || '').toString().toLowerCase();
+            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return sorted;
+    }, [users, searchTerm, sortConfig]);
+
+    const paginatedUsers = useMemo(() => {
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        return processedUsers.slice(startIndex, startIndex + rowsPerPage);
+    }, [processedUsers, currentPage, rowsPerPage]);
+
+    const totalPages = Math.ceil(processedUsers.length / rowsPerPage);
+
+    const handleSort = (key: string) => {
+        setSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
 
     const handleImport = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -131,172 +165,208 @@ export default function UsersPage() {
     };
 
     const selectAll = () => {
-        if (selectedUsers.length === filteredUsers.length) {
+        if (selectedUsers.length === processedUsers.length) {
             setSelectedUsers([]);
         } else {
-            setSelectedUsers(filteredUsers.map((u: any) => u.studentId));
+            setSelectedUsers(processedUsers.map((u: any) => u.studentId));
         }
     };
 
     if (isLoading) return <div className="flex h-screen w-full items-center justify-center bg-gray-50"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-slate-50">
+
             <Navbar />
 
-            <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">User Management</h1>
-                        <p className="mt-1 text-sm text-gray-500">Manage students, generate QRs, and track status.</p>
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Entity <span className="text-slate-400">Database</span></h1>
+                        <p className="mt-1 text-sm text-slate-500 font-medium tracking-tight">Provision secure tokens and monitor personnel authorization protocols.</p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3">
+                </div>
+
+                {/* Unified Action Bar */}
+                <div className="official-card bg-white p-2.5 flex flex-col xl:flex-row items-center gap-3 shadow-xl shadow-slate-200/40">
+                    <div className="flex w-full xl:w-auto gap-2">
                         <button
                             onClick={() => setIsImportModalOpen(true)}
-                            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            className="flex-1 xl:flex-none inline-flex items-center justify-center px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 transition-all active:scale-95 uppercase tracking-wider"
                         >
-                            <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" />
-                            Import Excel
+                            <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
+                            Import Assets
                         </button>
                         <button
                             onClick={() => handleGenerateQR(selectedUsers.length > 0 ? selectedUsers : 'all')}
                             disabled={isGenerating}
-                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                            className="flex-1 xl:flex-none inline-flex items-center justify-center px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-lg shadow-slate-300 hover:bg-slate-800 disabled:opacity-50 transition-all active:scale-95 uppercase tracking-wider"
                         >
-                            <QrCode className="mr-2 h-4 w-4" />
-                            {isGenerating ? 'Generating...' : 'Generate QRs'}
+                            {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4 text-blue-400" />}
+                            Issue Tokens
                         </button>
+                    </div>
+
+                    <div className="relative flex-1 w-full">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                            type="text"
+                            className="w-full pl-11 pr-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all"
+                            placeholder="Find records by name, ID or department..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="flex w-full xl:w-auto items-center gap-3">
+                        <div className="hidden sm:flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200">
+                            <button
+                                onClick={() => setViewMode('table')}
+                                className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+                            >
+                                <TableIcon size={16} />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+                            >
+                                <LayoutGrid size={16} />
+                            </button>
+                        </div>
+
                         <button
                             onClick={handleDownloadQR}
-                            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            className="flex-1 xl:flex-none inline-flex items-center justify-center px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm uppercase tracking-wider"
                         >
-                            <Download className="mr-2 h-4 w-4 text-blue-600" />
+                            <Download className="mr-2 h-4 w-4 text-blue-500" />
                             Download ZIP
                         </button>
                     </div>
                 </div>
 
-                {/* Filters & Content Block */}
-                <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden flex flex-col h-full">
-                    {/* Header: Search & View Toggle */}
-                    <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="relative max-w-sm w-full flex items-center gap-3">
-                            <div className="relative w-full">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Search className="h-4 w-4 text-gray-400" />
-                                </div>
-                                <input
-                                    type="text"
-                                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-shadow"
-                                    placeholder="Search students..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
-                            <div className="text-sm text-gray-500 whitespace-nowrap">
-                                {selectedUsers.length} selected
-                            </div>
-
-                            {/* View Toggle */}
-                            <div className="flex items-center p-1 bg-gray-100 rounded-lg border border-gray-200">
-                                <button
-                                    onClick={() => setViewMode('table')}
-                                    className={`p-1.5 rounded-md transition-all ${viewMode === 'table' ? 'bg-white shadow text-indigo-600 ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}
-                                    title="Table View"
-                                >
-                                    <TableIcon size={18} />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('grid')}
-                                    className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-indigo-600 ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'}`}
-                                    title="Grid View"
-                                >
-                                    <LayoutGrid size={18} />
-                                </button>
-                            </div>
-                        </div>
+                {/* Selected Count Indicator */}
+                {selectedUsers.length > 0 && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-200 animate-in slide-in-from-left-4 duration-300 max-w-fit">
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Selected Entities:</span>
+                        <span className="bg-white/20 px-2 py-0.5 rounded-lg text-xs font-bold leading-none">{selectedUsers.length}</span>
+                        <button onClick={() => setSelectedUsers([])} className="ml-2 hover:opacity-70">
+                            <XCircle size={14} />
+                        </button>
                     </div>
+                )}
 
-                    {/* Content Area */}
-                    <div className="flex-1 min-h-[500px] bg-gray-50/50">
-                        {filteredUsers.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center p-12 text-center text-gray-500 h-full">
-                                <div className="bg-gray-100 p-4 rounded-full mb-3">
-                                    <Search className="h-8 w-8 text-gray-400" />
+                {/* Content Block */}
+                <div className="official-card bg-white overflow-hidden shadow-2xl shadow-slate-200/50 border-slate-100">
+                    <div className="min-h-[600px] flex flex-col">
+                        {processedUsers.length === 0 ? (
+                            <div className="flex-1 flex flex-col items-center justify-center p-24 text-center">
+                                <div className="h-16 w-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4 border border-slate-100 group">
+                                    <Search className="h-6 w-6 text-slate-200" />
                                 </div>
-                                <p className="text-lg font-medium text-gray-900">No users found</p>
-                                <p className="text-sm">Try adjusting your search or import new users.</p>
+                                <p className="font-bold text-slate-900">Query Resulted in Zero Matches</p>
+                                <p className="text-xs text-slate-400 mt-1 max-w-xs transition-opacity">No database objects found corresponding to your current filter state.</p>
                             </div>
                         ) : viewMode === 'table' ? (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th scope="col" className="px-6 py-3 text-left w-10">
+                            <div className="overflow-x-auto custom-scrollbar flex-1">
+                                <table className="w-full text-left border-collapse min-w-[1000px]">
+                                    <thead>
+                                        <tr className="bg-slate-50/30 border-b border-slate-100">
+                                            <th scope="col" className="pl-8 pr-4 py-5 w-12">
                                                 <input
                                                     type="checkbox"
-                                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer"
                                                     onChange={selectAll}
-                                                    checked={filteredUsers.length > 0 && selectedUsers.length === filteredUsers.length}
+                                                    checked={processedUsers.length > 0 && selectedUsers.length === processedUsers.length}
                                                 />
                                             </th>
-                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student ID</th>
-                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
-                                            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">QR Status</th>
-                                            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                            <th
+                                                onClick={() => handleSort('studentId')}
+                                                scope="col"
+                                                className="px-6 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                            >
+                                                Identifier {sortConfig.key === 'studentId' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th
+                                                onClick={() => handleSort('fullName')}
+                                                scope="col"
+                                                className="px-6 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                            >
+                                                Personnel Identity {sortConfig.key === 'fullName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th
+                                                onClick={() => handleSort('class')}
+                                                scope="col"
+                                                className="px-6 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] cursor-pointer hover:text-blue-600 transition-colors"
+                                            >
+                                                Department {sortConfig.key === 'class' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                            </th>
+                                            <th scope="col" className="px-6 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] text-center">Protocol Status</th>
+                                            <th scope="col" className="px-6 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] text-right pr-8">Operations</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {filteredUsers.map((user: any) => (
-                                            <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <tbody className="divide-y divide-slate-50">
+                                        {paginatedUsers.map((user: any) => (
+                                            <tr key={user.id} className={`hover:bg-slate-50/50 transition-colors group ${selectedUsers.includes(user.studentId) ? 'bg-blue-50/20' : ''}`}>
+                                                <td className="pl-8 pr-4 py-6">
                                                     <input
                                                         type="checkbox"
-                                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer transition-all"
                                                         checked={selectedUsers.includes(user.studentId)}
                                                         onChange={() => toggleSelectUser(user.studentId)}
                                                     />
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.studentId}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                    <div className="flex items-center">
-                                                        <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold mr-3">
+                                                <td className="px-6 py-6 font-bold text-[11px] text-slate-400 tracking-widest font-mono uppercase">{user.studentId}</td>
+                                                <td className="px-6 py-6">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="h-10 w-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold overflow-hidden relative group-hover:bg-slate-900 group-hover:text-white transition-all shadow-sm">
                                                             {user.fullName.charAt(0)}
+                                                            <div className="absolute inset-0 bg-gradient-to-tr from-slate-200 to-transparent opacity-20"></div>
                                                         </div>
-                                                        <div className="flex flex-col">
-                                                            <span className="font-medium text-gray-900">{user.fullName}</span>
-                                                            <span className="text-xs text-gray-400">{user.email || 'No Email'}</span>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-slate-900 tracking-tight">{user.fullName}</p>
+                                                            <p className="text-[10px] font-medium text-slate-400 lowercase">{user.email || 'no_email_on_file'}</p>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <td className="px-6 py-6 whitespace-nowrap">
                                                     {user.class ? (
-                                                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{user.class}</span>
-                                                    ) : <span className="text-gray-400">-</span>}
+                                                        <span className="px-2.5 py-1 bg-slate-50 rounded-lg text-[10px] font-bold uppercase tracking-wider text-slate-500 border border-slate-200">{user.class}</span>
+                                                    ) : <span className="text-slate-300 font-bold text-[10px] tracking-widest uppercase">Unassigned</span>}
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <td className="px-6 py-6 text-center">
                                                     {user.qrToken ? (
-                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${user.qrStatus === 'used' ? 'bg-yellow-100 text-yellow-800' : user.qrStatus === 'expired' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                                                            {user.qrStatus === 'used' ? 'Scanned' : 'Ready'}
+                                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${user.qrStatus === 'used' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
+                                                            <span className={`h-1 w-1 rounded-full ${user.qrStatus === 'used' ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
+                                                            {user.qrStatus === 'used' ? 'Locked' : 'Issued'}
                                                         </span>
-                                                    ) : <span className="text-xs text-gray-400 italic">Not Generated</span>}
+                                                    ) : <span className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em]">Token Not Primed</span>}
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                                    <div className="flex items-center justify-center gap-2">
+                                                <td className="px-6 py-6 text-right pr-8">
+                                                    <div className="flex items-center justify-end gap-2">
                                                         {user.qrToken && (
                                                             <>
-                                                                <button onClick={() => handleSendEmail(user.id)} disabled={!user.email || (sendingId === user.id)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-30">
-                                                                    {sendingId === user.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail size={18} />}
+                                                                <button
+                                                                    onClick={() => handleSendEmail(user.id)}
+                                                                    disabled={!user.email || (sendingId === user.id)}
+                                                                    className="h-9 w-9 flex items-center justify-center border border-slate-200 rounded-lg text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all disabled:opacity-20"
+                                                                    title="Send via Email"
+                                                                >
+                                                                    {sendingId === user.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail size={16} />}
                                                                 </button>
-                                                                <button onClick={() => handleWhatsApp(user.mobile, user)} disabled={!user.mobile} className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-30">
-                                                                    <MessageSquare size={18} />
+                                                                <button
+                                                                    onClick={() => handleWhatsApp(user.mobile, user)}
+                                                                    disabled={!user.mobile}
+                                                                    className="h-9 w-9 flex items-center justify-center border border-slate-200 rounded-lg text-slate-400 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-all disabled:opacity-20"
+                                                                    title="Send via WhatsApp"
+                                                                >
+                                                                    <MessageSquare size={16} />
                                                                 </button>
                                                             </>
                                                         )}
+                                                        <button className="h-9 w-9 flex items-center justify-center border border-slate-200 rounded-lg text-slate-400 hover:text-slate-900 transition-all">
+                                                            <MoreVertical size={16} />
+                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -305,63 +375,144 @@ export default function UsersPage() {
                                 </table>
                             </div>
                         ) : (
-                            // Grid Views
-                            <div className="p-4 grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {filteredUsers.map((user: any) => (
+                            <div className="p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 flex-1">
+                                {paginatedUsers.map((user: any) => (
                                     <div
                                         key={user.id}
-                                        className={`group relative bg-white border rounded-xl overflow-hidden hover:shadow-md transition-all ${selectedUsers.includes(user.studentId) ? 'ring-2 ring-indigo-500 border-indigo-500' : 'border-gray-200'}`}
+                                        className={`group relative bg-white border border-slate-100 rounded-[2rem] p-6 transition-all duration-500 hover:shadow-2xl hover:shadow-slate-200/60 hover:-translate-y-1 ${selectedUsers.includes(user.studentId) ? 'ring-2 ring-blue-500 bg-blue-50/10' : ''}`}
                                     >
-                                        <div className="p-4">
-                                            {/* Top Row: checkbox and status */}
-                                            <div className="flex items-start justify-between mb-3">
-                                                <input
-                                                    type="checkbox"
-                                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer h-5 w-5"
-                                                    checked={selectedUsers.includes(user.studentId)}
-                                                    onChange={() => toggleSelectUser(user.studentId)}
-                                                />
-                                                {user.qrToken ? (
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${user.qrStatus === 'used' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
-                                                        {user.qrStatus || 'Ready'}
-                                                    </span>
-                                                ) : <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">No QR</span>}
-                                            </div>
+                                        <div className="flex items-center justify-between mb-6">
+                                            <input
+                                                type="checkbox"
+                                                className="w-5 h-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer transition-all"
+                                                checked={selectedUsers.includes(user.studentId)}
+                                                onChange={() => toggleSelectUser(user.studentId)}
+                                            />
+                                            {user.qrToken ? (
+                                                <span className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border ${user.qrStatus === 'used' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                                                    {user.qrStatus === 'used' ? 'Locked' : 'Issued'}
+                                                </span>
+                                            ) : (
+                                                <span className="bg-slate-50 text-slate-300 border border-slate-100 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider">Unprimed</span>
+                                            )}
+                                        </div>
 
-                                            {/* Avatar & Info */}
-                                            <div className="flex flex-col items-center text-center">
-                                                <div className="h-14 w-14 rounded-full bg-gradient-to-br from-indigo-100 to-blue-50 flex items-center justify-center text-indigo-700 text-xl font-bold mb-3 shadow-inner">
+                                        <div className="flex flex-col items-center text-center">
+                                            <div className="relative mb-5 group-hover:scale-110 transition-transform duration-500">
+                                                <div className="h-20 w-20 rounded-[1.5rem] bg-slate-50 flex items-center justify-center text-slate-400 text-2xl font-bold border border-slate-100 shadow-inner group-hover:bg-slate-900 group-hover:text-white group-hover:border-slate-800 transition-all duration-500 overflow-hidden relative">
                                                     {user.fullName.charAt(0)}
+                                                    <div className="absolute inset-0 bg-gradient-to-tr from-black/5 to-transparent"></div>
                                                 </div>
-                                                <h3 className="text-base font-semibold text-gray-900 line-clamp-1">{user.fullName}</h3>
-                                                <p className="text-sm text-gray-500 mb-1">{user.studentId}</p>
-                                                {user.class && <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded mb-3">{user.class}</span>}
+                                                {user.qrToken && (
+                                                    <div className="absolute -bottom-1 -right-1 h-6 w-6 bg-blue-600 rounded-xl flex items-center justify-center border-2 border-white shadow-lg">
+                                                        <CheckCircle size={12} className="text-white" />
+                                                    </div>
+                                                )}
                                             </div>
 
-                                            {/* Actions */}
-                                            <div className="flex items-center justify-center gap-2 mt-2 pt-3 border-t border-gray-100">
+                                            <h3 className="text-base font-bold text-slate-900 line-clamp-1 mb-1 tracking-tight group-hover:text-blue-600 transition-colors">{user.fullName}</h3>
+                                            <p className="text-[10px] font-bold text-slate-400 tracking-[0.2em] mb-4 uppercase font-mono">{user.studentId}</p>
+
+                                            {user.class && (
+                                                <div className="px-4 py-1.5 bg-slate-50 rounded-full border border-slate-100 mb-4">
+                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest line-clamp-1">{user.class}</span>
+                                                </div>
+                                            )}
+
+                                            <p className="text-[11px] font-medium text-slate-400 truncate w-full mb-8 px-2 lowercase">{user.email || 'no_archive_available'}</p>
+                                        </div>
+
+                                        {user.qrToken ? (
+                                            <div className="grid grid-cols-2 gap-3 pt-6 border-t border-slate-50">
                                                 <button
                                                     onClick={() => handleSendEmail(user.id)}
-                                                    disabled={!user.email || !user.qrToken || (sendingId === user.id)}
-                                                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors disabled:opacity-30"
-                                                    title="Email QR"
+                                                    disabled={!user.email || (sendingId === user.id)}
+                                                    className="flex items-center justify-center gap-2 py-3 rounded-2xl text-[11px] font-bold bg-slate-50 text-slate-600 hover:bg-blue-600 hover:text-white transition-all disabled:opacity-30 border border-slate-100 hover:border-blue-700 shadow-sm"
                                                 >
-                                                    {sendingId === user.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail size={18} />}
+                                                    {sendingId === user.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail size={14} />}
+                                                    Email
                                                 </button>
                                                 <button
                                                     onClick={() => handleWhatsApp(user.mobile, user)}
-                                                    disabled={!user.mobile || !user.qrToken}
-                                                    className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors disabled:opacity-30"
-                                                    title="WhatsApp QR"
+                                                    disabled={!user.mobile}
+                                                    className="flex items-center justify-center gap-2 py-3 rounded-2xl text-[11px] font-bold bg-slate-50 text-slate-600 hover:bg-emerald-600 hover:text-white transition-all disabled:opacity-30 border border-slate-100 hover:border-emerald-700 shadow-sm"
                                                 >
-                                                    <MessageSquare size={18} />
+                                                    <MessageSquare size={14} />
+                                                    WhatsApp
                                                 </button>
                                             </div>
-                                        </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleGenerateQR([user.studentId])}
+                                                disabled={isGenerating}
+                                                className="w-full py-3.5 rounded-2xl text-[11px] font-bold bg-slate-900 text-white hover:bg-black transition-all shadow-xl shadow-slate-200 mt-2 active:scale-95 uppercase tracking-wider"
+                                            >
+                                                Initialize Protocol
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
                         )}
+
+                        {/* Pagination Footer */}
+                        <div className="px-8 py-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/20">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-semibold text-slate-500">Rows per page</span>
+                                <div className="relative">
+                                    <select
+                                        value={rowsPerPage}
+                                        onChange={(e) => {
+                                            setRowsPerPage(Number(e.target.value));
+                                            setCurrentPage(1);
+                                        }}
+                                        className="appearance-none pl-3 pr-8 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none hover:border-slate-300 transition-all cursor-pointer min-w-[70px]"
+                                    >
+                                        <option value={12}>12</option>
+                                        <option value={24}>24</option>
+                                        <option value={48}>48</option>
+                                    </select>
+                                    <ChevronRight size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 rotate-90" />
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-6">
+                                <span className="text-xs font-bold text-slate-500 tabular-nums">
+                                    {processedUsers.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1}-
+                                    {Math.min(currentPage * rowsPerPage, processedUsers.length)} of {processedUsers.length}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setCurrentPage(1)}
+                                        disabled={currentPage === 1}
+                                        className="h-8 w-8 rounded-lg border border-slate-100 flex items-center justify-center text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white hover:border-slate-300 transition-all"
+                                    >
+                                        <ChevronsLeft size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        disabled={currentPage === 1}
+                                        className="h-8 w-8 rounded-lg border border-slate-100 flex items-center justify-center text-slate-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white hover:border-slate-300 transition-all"
+                                    >
+                                        <ChevronLeft size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                        disabled={currentPage === totalPages || totalPages === 0}
+                                        className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white hover:border-slate-300 transition-all"
+                                    >
+                                        <ChevronRight size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        disabled={currentPage === totalPages || totalPages === 0}
+                                        className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white hover:border-slate-300 transition-all"
+                                    >
+                                        <ChevronsRight size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </main>
@@ -375,17 +526,17 @@ export default function UsersPage() {
                         </button>
                         <div className="mb-6">
                             <h3 className="text-xl font-bold text-gray-900">Import Users</h3>
-                            <p className="text-sm text-gray-500 mt-1">Upload an Excel (.xlsx) or CSV file with columns: ID, Name, Email (optional).</p>
+                            <p className="text-sm text-gray-500 mt-1 font-medium">Upload an Excel (.xlsx) or CSV file with the required data structure.</p>
                         </div>
                         <form onSubmit={handleImport} className="space-y-4">
-                            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative">
-                                <FileSpreadsheet className="h-10 w-10 text-gray-400 mb-3" />
-                                <span className="text-sm font-medium text-gray-600">{file ? file.name : "Click to select file"}</span>
+                            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer relative group">
+                                <FileSpreadsheet className="h-10 w-10 text-slate-300 mb-3 group-hover:text-blue-500 transition-colors" />
+                                <span className="text-sm font-semibold text-slate-600">{file ? file.name : "Click to select source file"}</span>
                                 <input type="file" accept=".xlsx, .xls, .csv" onChange={(e) => setFile(e.target.files?.[0] || null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                             </div>
-                            <button type="submit" disabled={!file || isImporting} className="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-sm font-medium rounded-xl text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200 transition-all">
+                            <button type="submit" disabled={!file || isImporting} className="w-full inline-flex justify-center items-center px-4 py-3.5 border border-transparent text-sm font-bold rounded-2xl text-white bg-slate-900 hover:bg-slate-800 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-slate-200 transition-all active:scale-[0.98]">
                                 {isImporting && <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />}
-                                {isImporting ? 'Importing...' : 'Upload & Import'}
+                                {isImporting ? 'Processing Data...' : 'Initiate Import'}
                             </button>
                         </form>
                     </div>

@@ -475,6 +475,20 @@ exports.sendQRViaEmail = async (req, res) => {
 };
 
 
+// Delete Scan Record
+exports.deleteScanRecord = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        await db.delete(qrScans).where(eq(qrScans.id, id));
+
+        res.json({ message: "Scan record deleted successfully" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 exports.getAllUsers = async (req, res) => {
     try {
         // updated to left join qr_codes

@@ -4,6 +4,7 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import jsQR from "jsqr";
 import { Loader2, Camera, XCircle, CheckCircle, AlertTriangle, ScanLine, RotateCcw, History } from "lucide-react";
 import { useScanQRMutation, useGetStatsQuery } from "@/lib/features/apiSlice";
+import Link from "next/link";
 
 export default function Scanner() {
     const [scanResult, setScanResult] = useState<any>(null);
@@ -172,162 +173,143 @@ export default function Scanner() {
     const isError = !isSuccess && !isWarning;
 
     return (
-        <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto p-4">
-            {/* Main Scanner Card */}
-            <div className="w-full max-w-lg mx-auto overflow-hidden bg-black rounded-3xl shadow-2xl ring-1 ring-gray-900/5 relative">
+        <div className="flex flex-col w-full">
+            {/* Main Scanner Section */}
+            <div className="w-full bg-slate-950 flex flex-col relative overflow-hidden">
                 {/* Header */}
-                <div className="bg-gray-900 border-b border-gray-800 p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-white">
-                        <Camera size={20} className="text-blue-500" />
-                        <h2 className="font-semibold tracking-wide">QR Check-in</h2>
+                <div className="px-8 py-6 flex items-center justify-between border-b border-white/5 bg-slate-900/40 backdrop-blur-md">
+                    <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-2xl bg-blue-600/10 flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                            <Camera size={20} />
+                        </div>
+                        <div>
+                            <h2 className="text-sm font-bold text-white tracking-wide uppercase">Security Scanner</h2>
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">Active Cluster:</span>
+                                <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest bg-blue-500/10 px-1.5 py-0.5 rounded">Alpha-01</span>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        {scanning ? (
-                            <>
-                                <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
-                                <span className="text-xs font-medium text-gray-400">Live Camera</span>
-                            </>
-                        ) : (
-                            <span className="text-xs font-medium text-gray-500">Camera Off</span>
-                        )}
-                    </div>
+
+                    {scanning && (
+                        <div className="flex items-center gap-3 px-4 py-1.5 bg-emerald-500/10 rounded-full border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Signal Live</span>
+                        </div>
+                    )}
                 </div>
 
-                <div className="relative min-h-[350px] bg-black flex flex-col items-center justify-center">
-
+                {/* Viewport Area */}
+                <div className="relative aspect-video sm:aspect-[16/9] bg-slate-950 flex items-center justify-center overflow-hidden">
                     {/* Camera Viewport */}
-                    <div id="reader" className={`w-full h-full [&>video]:!object-cover [&>video]:!rounded-lg ${scanResult ? 'opacity-20 blur-sm' : 'opacity-100'}`} />
+                    <div id="reader" className={`w-full h-full [&>video]:!object-cover ${scanResult ? 'opacity-20 blur-2xl scale-110' : 'opacity-100'} transition-all duration-700`} />
 
-                    {/* Start/Stop Controls (if needed) */}
-                    {!scanning && !scanResult && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
-                            <button
-                                onClick={startScanner}
-                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-semibold transition-all shadow-lg shadow-blue-500/20"
-                            >
-                                <Camera size={20} />
-                                Open Camera
-                            </button>
+                    {/* Camera Guide Lines */}
+                    {!scanResult && scanning && (
+                        <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
+                            <div className="relative w-48 h-48 sm:w-72 sm:h-72">
+                                <div className="absolute top-0 left-0 w-16 h-16 border-t-[3px] border-l-[3px] border-blue-500 rounded-tl-3xl opacity-80 shadow-[-4px_-4px_10px_rgba(59,130,246,0.3)]"></div>
+                                <div className="absolute top-0 right-0 w-16 h-16 border-t-[3px] border-r-[3px] border-blue-500 rounded-tr-3xl opacity-80 shadow-[4px_-4px_10px_rgba(59,130,246,0.3)]"></div>
+                                <div className="absolute bottom-0 left-0 w-16 h-16 border-b-[3px] border-l-[3px] border-blue-500 rounded-bl-3xl opacity-80 shadow-[-4px_4px_10px_rgba(59,130,246,0.3)]"></div>
+                                <div className="absolute bottom-0 right-0 w-16 h-16 border-b-[3px] border-r-[3px] border-blue-500 rounded-br-3xl opacity-80 shadow-[4px_4px_10px_rgba(59,130,246,0.3)]"></div>
+
+                                <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-scan opacity-80 shadow-[0_0_20px_rgba(59,130,246,0.6)]"></div>
+                            </div>
+
+                            <div className="absolute bottom-10 px-6 py-3 bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-white/10 text-white/80 text-[10px] font-bold uppercase tracking-[0.2em] shadow-2xl flex items-center gap-3">
+                                <ScanLine size={14} className="text-blue-500 animate-pulse" />
+                                Optical Focus Required
+                            </div>
                         </div>
                     )}
 
                     {/* Result Overlay */}
                     {scanResult && (
-                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-gray-900/90 backdrop-blur-md p-6 animate-in fade-in zoom-in duration-300">
-                            <div className="w-full text-center">
-                                <div className={`mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full ${isSuccess ? 'bg-green-500/10 text-green-500' :
-                                    isWarning ? 'bg-yellow-500/10 text-yellow-500' :
-                                        'bg-red-500/10 text-red-500'
+                        <div className="absolute inset-0 z-20 flex items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-500">
+                            <div className="w-full max-w-sm flex flex-col items-center">
+                                <div className={`mb-8 flex h-28 w-28 items-center justify-center rounded-[2.5rem] shadow-2xl transition-all border-2 ${isSuccess ? 'bg-blue-600 border-blue-400/50 text-white rotate-0' :
+                                    isWarning ? 'bg-amber-500 border-amber-300/50 text-white rotate-12' :
+                                        'bg-rose-600 border-rose-400/50 text-white -rotate-12'
                                     }`}>
-                                    {isSuccess ? <CheckCircle size={40} /> :
-                                        isWarning ? <AlertTriangle size={40} /> :
-                                            <XCircle size={40} />}
+                                    {isSuccess ? <CheckCircle size={56} strokeWidth={2.5} /> :
+                                        isWarning ? <AlertTriangle size={56} strokeWidth={2.5} /> :
+                                            <XCircle size={56} strokeWidth={2.5} />}
                                 </div>
 
-                                <h3 className={`text-2xl font-bold mb-2 ${isSuccess ? 'text-white' : isWarning ? 'text-yellow-400' : 'text-red-400'}`}>
-                                    {isSuccess ? 'Access Granted' :
-                                        isWarning ? 'Already Scanned' : 'Access Denied'}
-                                </h3>
-
-                                {isWarning && (
-                                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2 mb-4 text-yellow-200 text-sm">
-                                        This QR was terminated/banded.
-                                    </div>
-                                )}
-
-                                <p className="text-gray-400 mb-6 font-medium">{scanResult.message}</p>
+                                <div className="text-center mb-8">
+                                    <h3 className="text-3xl font-bold text-white mb-3 tracking-tight">
+                                        {isSuccess ? 'Validated' :
+                                            isWarning ? 'Duplicate Scan' : 'Auth Failed'}
+                                    </h3>
+                                    <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-[260px] mx-auto">
+                                        {scanResult.message}
+                                    </p>
+                                </div>
 
                                 {scanResult.user && (
-                                    <div className="mb-6 rounded-xl bg-gray-800/50 p-4 border border-gray-700 text-left">
-                                        <div className="grid grid-cols-[auto_1fr] gap-3 items-center">
-                                            <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold">
+                                    <div className="w-full mb-10 rounded-[2rem] bg-white/5 border border-white/10 p-6 backdrop-blur-xl shadow-inner">
+                                        <div className="flex items-center gap-5 mb-5">
+                                            <div className="h-14 w-14 rounded-2xl bg-blue-600/20 flex items-center justify-center text-blue-400 font-bold text-xl border border-blue-500/20">
                                                 {scanResult.user.fullName?.[0] || 'U'}
                                             </div>
                                             <div>
-                                                <p className="font-bold text-white text-lg leading-tight">{scanResult.user.fullName || scanResult.user.name}</p>
-                                                <p className="text-gray-500 text-xs font-mono">{scanResult.user.studentId || scanResult.user.id}</p>
+                                                <p className="font-bold text-white text-lg tracking-tight">{scanResult.user.fullName || scanResult.user.name}</p>
+                                                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest font-mono mt-1">{scanResult.user.studentId || scanResult.user.id}</p>
                                             </div>
                                         </div>
-                                        {scanResult.user.class && (
-                                            <div className="mt-3 pt-3 border-t border-gray-700/50 flex justify-between items-center text-sm">
-                                                <span className="text-gray-500">Class/Dept</span>
-                                                <span className="text-gray-300 font-medium">{scanResult.user.class}</span>
-                                            </div>
-                                        )}
-                                        {scanResult.scannedAt && (
-                                            <div className="mt-2 pt-2 border-t border-gray-700/50 flex justify-between items-center text-sm text-red-300">
-                                                <span>First Scanned</span>
-                                                <span>{new Date(scanResult.scannedAt).toLocaleTimeString()}</span>
-                                            </div>
-                                        )}
+
+                                        <div className="space-y-3">
+                                            {scanResult.user.class && (
+                                                <div className="flex justify-between items-center text-xs">
+                                                    <span className="text-slate-500 font-bold uppercase tracking-wider">Assigned Sector</span>
+                                                    <span className="text-slate-200 font-bold bg-white/5 px-2 py-0.5 rounded-lg border border-white/5">{scanResult.user.class}</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
 
                                 <button
                                     onClick={resetScanner}
-                                    className={`w-full rounded-xl px-4 py-3.5 font-bold text-white shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 ${isSuccess ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/20' :
-                                        'bg-gray-700 hover:bg-gray-600'
+                                    className={`w-full rounded-2xl px-8 py-5 font-bold text-white transition-all active:scale-[0.97] flex items-center justify-center gap-4 shadow-2xl ${isSuccess ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30' :
+                                        'bg-slate-800 hover:bg-slate-700 shadow-black/40'
                                         }`}
                                 >
-                                    <RotateCcw size={18} />
-                                    Scan Next QR
+                                    <RotateCcw size={20} />
+                                    Terminal Reset
                                 </button>
                             </div>
                         </div>
                     )}
 
-                    {/* Scanner Guide Overlay */}
-                    {!scanResult && scanning && (
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                            <div className="h-64 w-64 rounded-3xl border-2 border-white/20 relative">
-                                <div className="absolute top-0 left-0 h-8 w-8 border-l-4 border-t-4 border-blue-500 rounded-tl-xl -translate-x-1 -translate-y-1"></div>
-                                <div className="absolute top-0 right-0 h-8 w-8 border-r-4 border-t-4 border-blue-500 rounded-tr-xl translate-x-1 -translate-y-1"></div>
-                                <div className="absolute bottom-0 left-0 h-8 w-8 border-l-4 border-b-4 border-blue-500 rounded-bl-xl -translate-x-1 translate-y-1"></div>
-                                <div className="absolute bottom-0 right-0 h-8 w-8 border-r-4 border-b-4 border-blue-500 rounded-br-xl translate-x-1 translate-y-1"></div>
-                                <ScanLine className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500/50 animate-pulse w-full px-4" strokeWidth={1} />
-                            </div>
-                            <p className="absolute bottom-10 text-white/70 text-sm font-medium bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10">
-                                Point camera at QR Code
-                            </p>
-                        </div>
-                    )}
-
-                    {/* Loading Spinner */}
+                    {/* Loading Screen */}
                     {loading && (
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
-                            <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
-                            <p className="mt-4 font-medium text-white">Verifying...</p>
+                        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md">
+                            <div className="relative">
+                                <div className="absolute inset-0 rounded-full bg-blue-500/30 blur-2xl animate-pulse"></div>
+                                <Loader2 className="h-16 w-16 animate-spin text-blue-500 relative z-10" strokeWidth={3} />
+                            </div>
+                            <p className="mt-8 text-xs font-bold text-white uppercase tracking-[0.4em] animate-pulse">Handshaking Server</p>
                         </div>
                     )}
                 </div>
 
-                {/* File Upload Section */}
-                <div className="bg-gray-900 border-t border-gray-800 p-4">
-                    {/* Keep in DOM but invisible to ensure canvas rendering works */}
-                    <div id="html5-qrcode-temp" className="absolute opacity-0 pointer-events-none w-0 h-0 overflow-hidden"></div>
-                    <label className="flex items-center justify-center gap-2 w-full bg-gray-800 hover:bg-gray-700 text-white font-medium py-3 rounded-xl transition-colors border border-gray-700 cursor-pointer">
+                {/* Interaction Strip */}
+                <div className="bg-slate-900 border-t border-white/5 p-6 flex flex-col sm:flex-row gap-4">
+                    <label className="flex-1 flex items-center justify-center gap-4 bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 rounded-[1.25rem] transition-all cursor-pointer border border-white/5 group active:scale-[0.98]">
                         <input
                             type="file"
                             accept="image/*"
                             className="hidden"
                             onChange={async (e) => {
                                 if (e.target.files && e.target.files.length > 0) {
-                                    const originalFile = e.target.files[0];
+                                    const file = e.target.files[0];
                                     setLoading(true);
-
-                                    // Use a unique ID for temp scanner to avoid conflicts
-                                    const tempId = "html5-qrcode-temp";
-                                    // @ts-ignore
-                                    // kept for potential future use or to satisfy TS if needed, but we use jsQR now
-                                    // const html5QrCode = new Html5Qrcode(tempId);
-
                                     try {
-                                        // Robust Scan with jsQR
-                                        const decodedText = await scanFileWithJsQR(originalFile);
+                                        const decodedText = await scanFileWithJsQR(file);
                                         await handleScan(decodedText);
-                                    } catch (err: any) {
-                                        console.warn("File Scan Error:", err);
-                                        alert("Could not detect a valid QR code in this image. Please ensure the image is clear or try scanning with the camera.");
+                                    } catch (err) {
+                                        alert("Neural analysis failed. Please provide a clearer token capture.");
                                         startScanner();
                                     } finally {
                                         setLoading(false);
@@ -336,40 +318,71 @@ export default function Scanner() {
                                 }
                             }}
                         />
-                        <Camera size={18} className="text-blue-400" />
-                        <span>Upload QR Image</span>
+                        <div className="h-8 w-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+                            <ScanLine size={18} />
+                        </div>
+                        <span className="text-sm tracking-wide">Analysis: Optical File</span>
                     </label>
+                    <button
+                        onClick={() => scanning ? stopScanner() : startScanner()}
+                        className={`px-8 py-4 rounded-[1.25rem] font-bold text-sm transition-all border ${scanning
+                                ? 'bg-rose-500/10 border-rose-500/20 text-rose-500 hover:bg-rose-500/20'
+                                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20'
+                            }`}
+                    >
+                        {scanning ? 'Kill Stream' : 'Boot Sensor'}
+                    </button>
                 </div>
             </div>
 
-            {/* Recent Scans List */}
-            <div className="w-full max-w-lg mx-auto bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
-                <div className="p-4 border-b border-gray-800 flex items-center gap-2">
-                    <History size={18} className="text-gray-400" />
-                    <h3 className="font-semibold text-white">Recent Scans</h3>
+            {/* Audit Logs Section (Clean White) */}
+            <div className="w-full bg-white">
+                <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
+                            <History size={16} />
+                        </div>
+                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em]">Operational History</h3>
+                    </div>
+                    <Link href="/attendance" className="inline-flex items-center px-4 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all">
+                        Full Ledger
+                    </Link>
                 </div>
-                <div className="divide-y divide-gray-800 max-h-[300px] overflow-y-auto">
+
+                <div className="divide-y divide-slate-50 max-h-[300px] overflow-y-auto custom-scrollbar">
                     {statsData?.recentScans?.length > 0 ? (
                         statsData.recentScans.map((scan: any) => (
-                            <div key={scan.scanId} className="p-4 flex items-center justify-between hover:bg-gray-800/50 transition-colors">
-                                <div>
-                                    <p className="text-sm font-medium text-white">{scan.userName || 'Unknown User'}</p>
-                                    <p className="text-xs text-gray-500">{scan.studentId || '#'}</p>
+                            <div key={scan.scanId} className="px-8 py-5 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-10 w-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 font-bold group-hover:bg-slate-900 group-hover:text-white transition-all shadow-sm border border-slate-100">
+                                        {scan.userName?.[0] || '?'}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-900 tracking-tight">{scan.userName || 'Generic Entity'}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest font-mono mt-0.5">{scan.studentId || '#'}</p>
+                                    </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-xs text-gray-400">{new Date(scan.scannedAt).toLocaleTimeString()}</p>
-                                    <span className="text-[10px] text-green-500 bg-green-900/20 px-1.5 py-0.5 rounded border border-green-900/30">Active</span>
+                                    <p className="text-xs font-bold text-slate-900">{new Date(scan.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                    <div className="flex items-center justify-end gap-1.5 mt-1">
+                                        <span className="h-1 w-1 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]"></span>
+                                        <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Persistent</span>
+                                    </div>
                                 </div>
                             </div>
                         ))
                     ) : (
-                        <div className="p-8 text-center text-gray-500 text-sm">
-                            No recent scans found.
+                        <div className="py-16 text-center flex flex-col items-center">
+                            <div className="h-16 w-16 rounded-[2rem] bg-slate-50 flex items-center justify-center mb-4 text-slate-200">
+                                <History size={24} />
+                            </div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">No Log Activity</p>
                         </div>
                     )}
                 </div>
             </div>
         </div>
+
+
     );
 }
-

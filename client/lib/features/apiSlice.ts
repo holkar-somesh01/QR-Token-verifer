@@ -105,6 +105,13 @@ export const apiSlice = createApi({
             query: () => '/qr/history',
             providesTags: ['Stats'],
         }),
+        deleteScan: builder.mutation<any, { id: string }>({
+            query: ({ id }) => ({
+                url: `/qr/history/${id}`,
+                method: 'DELETE',
+            }),
+            invalidatesTags: ['Stats'],
+        }),
     }),
 })
 
@@ -119,6 +126,7 @@ export const {
     useGenerateQRsMutation,
     useScanTokenMutation,
     useSendQRViaEmailMutation,
-    useGetScanHistoryQuery
+    useGetScanHistoryQuery,
+    useDeleteScanMutation
 } = apiSlice
 

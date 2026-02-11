@@ -8,7 +8,8 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-    origin: ['http://localhost:3000', 'https://qrcodeverifer.vercel.app'],
+    // origin: ["http://192.168.1.21:3000", 'http://localhost:3000', 'https://qrcodeverifer.vercel.app'],
+    origin: "*",
     credentials: true
 }));
 app.use(bodyParser.json());
