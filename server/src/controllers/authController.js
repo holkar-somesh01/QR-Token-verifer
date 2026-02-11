@@ -12,21 +12,34 @@ exports.login = async (req, res) => {
     }
 
     try {
-        // 1. Check if ANY admin exists. If not, seed from ENV variables (First Run)
-        const allAdmins = await db.select().from(admins).limit(1);
-        if (allAdmins.length === 0) {
-            const envAdminId = process.env.ADMIN_ID;
-            const envAdminPass = process.env.ADMIN_PASSWORD;
+        // 1. Direct check against ENV variables as a fallback/initial login
+        const envAdminId = process.env.ADMIN_ID;
+        const envAdminPass = process.env.ADMIN_PASSWORD;
 
-            if (envAdminId && envAdminPass) {
+        if (envAdminId && envAdminPass && id === envAdminId && password === envAdminPass) {
+            // Check if this admin is already in DB, if not, save it
+            const existing = await db.select().from(admins).where(eq(admins.username, id)).limit(1);
+            if (existing.length === 0) {
                 const hashedPassword = await bcrypt.hash(envAdminPass, 10);
                 await db.insert(admins).values({
                     username: envAdminId,
                     password: hashedPassword,
                     role: 'superadmin'
                 });
-                console.log("Seeded initial admin from environment variables.");
             }
+
+            // Allow login immediately using ENV
+            const token = jwt.sign(
+                { id: 0, username: envAdminId, role: 'superadmin' },
+                process.env.JWT_SECRET,
+                { expiresIn: '1d' }
+            );
+
+            return res.status(200).json({
+                message: 'Login successful (ENV fallback)',
+                token,
+                user: { id: 0, name: envAdminId, role: 'superadmin' }
+            });
         }
 
         // 2. Fetch admin from DB
@@ -44,6 +57,7 @@ exports.login = async (req, res) => {
         if (!isValid) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
+
 
         // 4. Generate Token
         // Token expires in 1 day. Frontend should handle expiry.
