@@ -98,6 +98,31 @@ export default function LoginPage() {
                         <Mail size={18} />
                         Sign in with Google
                     </button>
+
+                    <div className="pt-4 mt-4 border-t border-gray-100">
+                        <details className="text-xs text-center text-gray-400 cursor-pointer">
+                            <summary className="hover:text-blue-500 transition-colors">Server Status (Diagnostic)</summary>
+                            <div className="mt-2 p-3 bg-gray-50 rounded-lg text-left space-y-1 font-mono">
+                                <p className="flex justify-between"><span>API URL:</span> <span className="text-blue-600 truncate ml-2">{process.env.NEXT_PUBLIC_API_URL || "Using Fallback"}</span></p>
+                                <button
+                                    onClick={async () => {
+                                        const url = `${process.env.NEXT_PUBLIC_API_URL || "https://qr-token-verifer-server.vercel.app/api"}/health`.replace('/api/health', '/health');
+                                        try {
+                                            const res = await fetch(url);
+                                            const data = await res.json();
+                                            alert(`Server Status: ${data.status}\nAdmin ID: ${data.admin_id}\nDatabase: ${data.database}`);
+                                        } catch (e) {
+                                            alert("Could not connect to backend server. Check your NEXT_PUBLIC_API_URL.");
+                                        }
+                                    }}
+                                    className="text-blue-500 hover:underline mt-2 block w-full text-center"
+                                >
+                                    Check Live Connection Now
+                                </button>
+                            </div>
+                        </details>
+                    </div>
+
                 </div>
             </div>
         </div>
