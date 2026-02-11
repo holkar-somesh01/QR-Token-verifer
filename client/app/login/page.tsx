@@ -17,21 +17,38 @@ export default function LoginPage() {
         setLoading(true);
         setError("");
 
-        const res = await signIn("credentials", {
-            id,
-            password,
-            redirect: false,
-        });
+        try {
+            const res = await signIn("credentials", {
+                id,
+                password,
+                redirect: false,
+            });
 
-        if (res?.error) {
-            console.error("Login Result Error:", res.error);
-            setError("Invalid ID or Password");
+            console.log("SignIn Response Received:", res);
+
+            if (!res) {
+                setError("No response from server. Check your connection.");
+                setLoading(false);
+                return;
+            }
+
+            if (res.error) {
+                console.error("Login Result Error:", res.error);
+                setError("Invalid ID or Password");
+                setLoading(false);
+            } else if (res.ok) {
+                console.log("Login Result Success, redirecting...");
+                window.location.href = "/";
+            } else {
+                setError("An unexpected error occurred during login.");
+                setLoading(false);
+            }
+        } catch (err: any) {
+            console.error("Client-side login exception:", err);
+            setError("Connection error. Please try again.");
             setLoading(false);
-        } else {
-            console.log("Login Result Success, redirecting...");
-            // Force a hard refresh/navigation if push is slow
-            window.location.href = "/";
         }
+
 
     };
 

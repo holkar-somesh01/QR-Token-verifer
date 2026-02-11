@@ -26,8 +26,12 @@ export const authOptions: NextAuthOptions = {
                 if (!credentials?.id || !credentials?.password) return null;
 
                 try {
-                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://qr-token-verifer-server.vercel.app/api";
-                    console.log("Attempting login at:", `${apiUrl}/auth/login`);
+                    const apiUrl = (process.env.NEXT_PUBLIC_API_URL || "https://qr-token-verifer-server.vercel.app/api").trim();
+                    console.log("Auth Triggered. API URL:", apiUrl);
+
+                    // Create an AbortController for timeout
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
                     const res = await fetch(`${apiUrl}/auth/login`, {
                         method: "POST",
@@ -35,29 +39,43 @@ export const authOptions: NextAuthOptions = {
                         body: JSON.stringify({
                             id: credentials.id,
                             password: credentials.password
-                        })
+                        }),
+                        signal: controller.signal
                     });
 
-                    console.log("Login HTTP Status:", res.status);
-                    const data = await res.json();
-                    console.log("Login Response Data:", data);
+                    clearTimeout(timeoutId);
 
-                    if (res.ok && data.user) {
+                    console.log("Backend Auth Status:", res.status);
+
+                    if (!res.ok) {
+                        const errorData = await res.json().catch(() => ({}));
+                        console.error("Backend Auth Failed Details:", errorData);
+                        return null;
+                    }
+
+                    const data = await res.json();
+                    console.log("Backend Auth Success. Received Token.");
+
+                    if (data.token && data.user) {
                         return {
-                            id: data.user.id,
+                            id: data.user.id.toString(),
                             name: data.user.name,
                             email: "admin@local.com",
-                            role: "admin",
+                            role: data.user.role,
                             accessToken: data.token,
                         };
                     }
-                    console.error("Login failed on server side:", data.message || "Unknown error");
+
+                    console.error("Backend returned success but no data.user or data.token");
                     return null;
-                } catch (e) {
-                    console.error("Critical Login Error in Auth.ts:", e);
+                } catch (e: any) {
+                    if (e.name === 'AbortError') {
+                        console.error("Login attempt timed out after 8 seconds");
+                    } else {
+                        console.error("Critical Login Error in Auth.ts:", e.message || e);
+                    }
                     return null;
                 }
-
             }
         })
     ],
