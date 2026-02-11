@@ -13,8 +13,8 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
     service: 'gmail', // Or use standard smtp
     auth: {
-        user: process.env.EMAIL_USER || '', // Needs to be in .env
-        pass: process.env.EMAIL_PASS || ''  // App Password if Gmail
+        user: process.env.FROM_EMAIL || '',
+        pass: process.env.EMAIL_PASS || ''
     }
 });
 
@@ -414,30 +414,40 @@ exports.downloadQRs = async (req, res) => {
 };
 
 // Send QR via Email
+// Send QR via Email (Single)
 exports.sendQRViaEmail = async (req, res) => {
     try {
         const { userId } = req.body;
         if (!userId) return res.status(400).json({ error: "User ID required" });
 
         // Get user and their QR
-        // Assume userId is the internal ID or studentID?
-        // Let's assume internal ID for safety, or check both.
-        let userRecord = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-        if (!userRecord.length) {
-            // Try studentId
-            userRecord = await db.select().from(users).where(eq(users.studentId, userId)).limit(1);
+        let user = await db.select().from(users).where(eq(users.id, userId)).limit(1).then(rows => rows[0]);
+        if (!user) {
+            user = await db.select().from(users).where(eq(users.studentId, userId)).limit(1).then(rows => rows[0]);
         }
 
-        if (!userRecord.length) return res.status(404).json({ error: "User not found" });
-        const user = userRecord[0];
-
+        if (!user) return res.status(404).json({ error: "User not found" });
         if (!user.email) return res.status(400).json({ error: "User has no email address" });
 
         const qrRecord = await db.select().from(qrCodes).where(eq(qrCodes.userId, user.id)).limit(1);
-        if (!qrRecord.length) return res.status(404).json({ error: "QR Code not generated for this user" });
 
-        const token = qrRecord[0].token;
-        const qrUrl = `${process.env.APP_URL || 'http://localhost:3000'}/scan/${token}`;
+        let token;
+        if (!qrRecord.length) {
+            // Auto-generate if missing?
+            token = generateToken();
+            await db.insert(qrCodes).values({
+                userId: user.id,
+                token: token,
+                status: 'unused',
+                createdAt: new Date(),
+                expiresAt: null,
+            });
+        } else {
+            token = qrRecord[0].token;
+        }
+
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000';
+        const qrUrl = `${appUrl}/scan/${token}`;
 
         // Generate QR Image Buffer
         const qrBuffer = await QRCode.toBuffer(qrUrl, {
@@ -445,22 +455,28 @@ exports.sendQRViaEmail = async (req, res) => {
         });
 
         const mailOptions = {
-            from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+            from: process.env.FROM_EMAIL,
             to: user.email,
             subject: 'Your Event Access QR Code',
             html: `
-                <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-                    <h2>Hello ${user.fullName},</h2>
-                    <p>Here is your personal QR code for the event.</p>
-                    <p>Please present this at the entrance.</p>
-                    <img src="cid:unique-qr-code" alt="QR Code" style="width: 250px; height: 250px; margin: 20px 0;" />
-                    <p style="color: #666; font-size: 12px;">ID: ${user.studentId}</p>
+                <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #333;">Hello ${user.fullName},</h2>
+                    <p style="font-size: 16px; color: #555;">Here is your personal QR code for the event.</p>
+                    <p style="font-size: 16px; color: #555;">Please present this at the entrance.</p>
+                    
+                    <div style="margin: 20px 0;">
+                        <img src="cid:unique-qr-code" alt="QR Code" style="width: 250px; height: 250px; border: 1px solid #ddd; padding: 10px; border-radius: 5px;" />
+                    </div>
+
+                    <p style="color: #666; font-size: 14px; background-color: #f9f9f9; padding: 10px; border-radius: 5px; display: inline-block;">ID: <strong>${user.studentId}</strong></p>
+                    
+                    <p style="margin-top: 30px; font-size: 12px; color: #999;">If the QR code does not load, please contact support.</p>
                 </div>
             `,
             attachments: [{
                 filename: 'qrcode.png',
                 content: qrBuffer,
-                cid: 'unique-qr-code' // same cid value as firmly referenced in html img src
+                cid: 'unique-qr-code'
             }]
         };
 
@@ -471,6 +487,109 @@ exports.sendQRViaEmail = async (req, res) => {
     } catch (error) {
         console.error("Email error:", error);
         res.status(500).json({ error: "Failed to send email: " + error.message });
+    }
+};
+
+// Send Bulk QRs via Email
+exports.sendBulkQRViaEmail = async (req, res) => {
+    try {
+        const { userIds } = req.body; // Array of IDs or 'all'
+
+        let targetUsers = [];
+        if (!userIds || userIds === 'all') {
+            // Fetch all users with email
+            targetUsers = await db.select().from(users).where(sql`${users.email} IS NOT NULL AND ${users.email} != ''`);
+        } else {
+            const isStringIds = userIds.some(id => typeof id === 'string');
+            if (isStringIds) {
+                targetUsers = await db.select().from(users).where(inArray(users.studentId, userIds));
+            } else {
+                targetUsers = await db.select().from(users).where(inArray(users.id, userIds));
+            }
+        }
+
+        // Filter out users without email
+        targetUsers = targetUsers.filter(u => u.email);
+
+        if (targetUsers.length === 0) {
+            return res.status(404).json({ error: "No users with email addresses found for selection." });
+        }
+
+        const results = { sent: 0, failed: 0, errors: [] };
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000';
+
+        // Process in chunks to avoid overwhelming the mail server
+        // But for <100 users, sequential or small parallel is fine.
+        // Let's do sequential for safety and accurate reporting.
+
+        for (const user of targetUsers) {
+            try {
+                // Get or Create QR
+                let qrRecord = await db.select().from(qrCodes).where(eq(qrCodes.userId, user.id)).limit(1);
+                let token;
+
+                if (!qrRecord.length) {
+                    token = generateToken();
+                    await db.insert(qrCodes).values({
+                        userId: user.id,
+                        token: token,
+                        status: 'unused',
+                        createdAt: new Date(),
+                        expiresAt: null,
+                    });
+                } else {
+                    token = qrRecord[0].token;
+                }
+
+                const qrUrl = `${appUrl}/scan/${token}`;
+                const qrBuffer = await QRCode.toBuffer(qrUrl, {
+                    errorCorrectionLevel: 'H', margin: 1, width: 300
+                });
+
+                const mailOptions = {
+                    from: process.env.FROM_EMAIL,
+                    to: user.email,
+                    subject: 'Your Event Access QR Code',
+                    html: `
+                        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; max-width: 600px; margin: 0 auto;">
+                            <h2 style="color: #333;">Hello ${user.fullName},</h2>
+                            <p style="font-size: 16px; color: #555;">Here is your personal QR code for the event.</p>
+                            <p style="font-size: 16px; color: #555;">Please present this at the entrance.</p>
+                            
+                            <div style="margin: 20px 0;">
+                                <img src="cid:unique-qr-code" alt="QR Code" style="width: 250px; height: 250px; border: 1px solid #ddd; padding: 10px; border-radius: 5px;" />
+                            </div>
+
+                            <p style="color: #666; font-size: 14px; background-color: #f9f9f9; padding: 10px; border-radius: 5px; display: inline-block;">ID: <strong>${user.studentId}</strong></p>
+                            
+                            <p style="margin-top: 30px; font-size: 12px; color: #999;">If the QR code does not load, please contact support.</p>
+                        </div>
+                    `,
+                    attachments: [{
+                        filename: 'qrcode.png',
+                        content: qrBuffer,
+                        cid: 'unique-qr-code'
+                    }]
+                };
+
+                await transporter.sendMail(mailOptions);
+                results.sent++;
+
+            } catch (err) {
+                console.error(`Failed to email user ${user.id}:`, err);
+                results.failed++;
+                results.errors.push({ userId: user.id, email: user.email, error: err.message });
+            }
+        }
+
+        res.json({
+            message: `Bulk email processing complete. Sent: ${results.sent}, Failed: ${results.failed}`,
+            details: results
+        });
+
+    } catch (error) {
+        console.error("Bulk Email error:", error);
+        res.status(500).json({ error: "Failed to process bulk emails: " + error.message });
     }
 };
 

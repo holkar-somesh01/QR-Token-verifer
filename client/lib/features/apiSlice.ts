@@ -55,9 +55,9 @@ export const apiSlice = createApi({
             }),
             invalidatesTags: ['Stats'],
         }),
-        sendEmails: builder.mutation<any, { studentIds: string[] }>({
+        sendBulkEmails: builder.mutation<any, { userIds: string[] | 'all' }>({
             query: (body) => ({
-                url: '/email',
+                url: '/qr/send-email/bulk',
                 method: 'POST',
                 body,
             }),
@@ -119,7 +119,7 @@ export const {
     useGetStatsQuery,
     useSyncSheetMutation,
     useScanQRMutation,
-    useSendEmailsMutation,
+    useSendBulkEmailsMutation,
     useGetQRStatsQuery,
     useGetUsersQuery,
     useImportUsersMutation,

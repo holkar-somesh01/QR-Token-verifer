@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
-import { useGetUsersQuery, useImportUsersMutation, useGenerateQRsMutation, useSendQRViaEmailMutation } from '@/lib/features/apiSlice';
+import { useGetUsersQuery, useImportUsersMutation, useGenerateQRsMutation, useSendQRViaEmailMutation, useSendBulkEmailsMutation } from '@/lib/features/apiSlice';
 import { useSession } from 'next-auth/react';
 import { Loader2, Upload, QrCode, Download, Search, CheckCircle, XCircle, FileSpreadsheet, RefreshCw, Mail, MessageSquare, ExternalLink, LayoutGrid, Table as TableIcon, MoreVertical, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import Image from 'next/image';
@@ -12,6 +12,7 @@ export default function UsersPage() {
     const [importUsers, { isLoading: isImporting }] = useImportUsersMutation();
     const [generateQRs, { isLoading: isGenerating }] = useGenerateQRsMutation();
     const [sendEmail, { isLoading: isSendingEmail }] = useSendQRViaEmailMutation();
+    const [sendBulkEmails, { isLoading: isSendingBulk }] = useSendBulkEmailsMutation();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
@@ -141,6 +142,22 @@ export default function UsersPage() {
         }
     };
 
+    const handleSendBulkEmail = async () => {
+        const targetIds = selectedUsers.length > 0 ? selectedUsers : 'all';
+        const message = targetIds === 'all'
+            ? "Send QR codes via email to ALL users with an email address?"
+            : `Send QR codes to ${selectedUsers.length} selected users?`;
+
+        if (!confirm(message)) return;
+
+        try {
+            const result = await sendBulkEmails({ userIds: targetIds }).unwrap();
+            alert(result.message || 'Emails dispatched successfully!');
+        } catch (err: any) {
+            alert('Failed to send emails: ' + (err.data?.error || err.message));
+        }
+    };
+
     const handleWhatsApp = (mobile: string, user: any) => {
         if (!mobile) return alert("No mobile number for this user.");
         // Clean number
@@ -205,6 +222,14 @@ export default function UsersPage() {
                         >
                             {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4 text-blue-400" />}
                             Issue Tokens
+                        </button>
+                        <button
+                            onClick={handleSendBulkEmail}
+                            disabled={isSendingBulk}
+                            className="flex-1 xl:flex-none inline-flex items-center justify-center px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 disabled:opacity-50 transition-all active:scale-95 uppercase tracking-wider"
+                        >
+                            {isSendingBulk ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4 text-blue-100" />}
+                            Dispatch Emails
                         </button>
                     </div>
 

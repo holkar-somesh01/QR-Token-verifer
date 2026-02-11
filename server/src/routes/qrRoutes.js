@@ -33,4 +33,7 @@ router.get('/users', verifyToken, qrController.getAllUsers);
 // Send Email (Protected)
 router.post('/send-email', verifyToken, qrController.sendQRViaEmail);
 
+// Send Bulk Emails (Protected)
+router.post('/send-email/bulk', verifyToken, qrController.sendBulkQRViaEmail);
+
 module.exports = router;
