@@ -6,25 +6,23 @@ const { eq } = require('drizzle-orm');
 
 exports.login = async (req, res) => {
     const { id, password } = req.body;
+    const inputId = id?.trim();
+    const inputPass = password?.trim();
 
-    if (!id || !password) {
+    if (!inputId || !inputPass) {
         return res.status(400).json({ message: 'Username and Password are required' });
     }
 
     try {
-        // 1. Direct check against ENV variables as a fallback/initial login
-        const envAdminId = process.env.ADMIN_ID;
-        const envAdminPass = process.env.ADMIN_PASSWORD;
+        const envAdminId = process.env.ADMIN_ID?.trim();
+        const envAdminPass = process.env.ADMIN_PASSWORD?.trim();
 
-        console.log(`Login attempt for ID: ${id}`);
-        console.log(`Checking against ENV: ${envAdminId ? 'ID is set' : 'ID IS MISSING'} - Pass: ${envAdminPass ? 'Pass is set' : 'Pass IS MISSING'}`);
+        console.log(`Login attempt for ID: "${inputId}"`);
 
-        if (envAdminId && envAdminPass && id === envAdminId && password === envAdminPass) {
+        if (envAdminId && envAdminPass && inputId === envAdminId && inputPass === envAdminPass) {
             console.log("ENV Match found - proceeds to login");
-            // Check if this admin is already in DB, if not, save it
-            const existing = await db.select().from(admins).where(eq(admins.username, id)).limit(1);
+            const existing = await db.select().from(admins).where(eq(admins.username, inputId)).limit(1);
             if (existing.length === 0) {
-
                 const hashedPassword = await bcrypt.hash(envAdminPass, 10);
                 await db.insert(admins).values({
                     username: envAdminId,
@@ -33,7 +31,6 @@ exports.login = async (req, res) => {
                 });
             }
 
-            // Allow login immediately using ENV
             const token = jwt.sign(
                 { id: 0, username: envAdminId, role: 'superadmin' },
                 process.env.JWT_SECRET,
@@ -47,25 +44,19 @@ exports.login = async (req, res) => {
             });
         }
 
-        // 2. Fetch admin from DB
-        const adminRecord = await db.select().from(admins).where(eq(admins.username, id)).limit(1);
-
+        const adminRecord = await db.select().from(admins).where(eq(admins.username, inputId)).limit(1);
         if (adminRecord.length === 0) {
+            console.log("No DB record found for this username");
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
         const admin = adminRecord[0];
-
-        // 3. Verify Password
-        const isValid = await bcrypt.compare(password, admin.password);
-
+        const isValid = await bcrypt.compare(inputPass, admin.password);
         if (!isValid) {
+            console.log("Password mismatch for DB record");
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
-
-        // 4. Generate Token
-        // Token expires in 1 day. Frontend should handle expiry.
         const token = jwt.sign(
             { id: admin.id, username: admin.username, role: admin.role },
             process.env.JWT_SECRET,
@@ -75,11 +66,7 @@ exports.login = async (req, res) => {
         return res.status(200).json({
             message: 'Login successful',
             token,
-            user: {
-                id: admin.id,
-                name: admin.username,
-                role: admin.role
-            }
+            user: { id: admin.id, name: admin.username, role: admin.role }
         });
 
     } catch (err) {
