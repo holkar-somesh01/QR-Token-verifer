@@ -70,7 +70,7 @@ export default function UsersPage() {
         if (selectedUsers.length === 0 && !confirm("Download ALL QR codes?")) return;
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://qr-token-verifer-server.vercel.app/api";
             const res = await fetch(`${apiUrl}/qr/download`, {
                 method: 'POST',
                 headers: {

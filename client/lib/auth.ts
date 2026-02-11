@@ -26,7 +26,7 @@ export const authOptions: NextAuthOptions = {
                 if (!credentials?.id || !credentials?.password) return null;
 
                 try {
-                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://qr-token-verifer-server.vercel.app/api";
                     const res = await fetch(`${apiUrl}/auth/login`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },

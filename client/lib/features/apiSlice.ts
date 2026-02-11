@@ -4,7 +4,7 @@ import { getSession } from 'next-auth/react'
 import { signOut } from 'next-auth/react';
 
 const baseQuery = fetchBaseQuery({
-    baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+    baseUrl: process.env.NEXT_PUBLIC_API_URL || 'https://qr-token-verifer-server.vercel.app/api',
     prepareHeaders: async (headers) => {
         const session = await getSession();
         // @ts-ignore
