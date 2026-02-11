@@ -27,6 +27,8 @@ export const authOptions: NextAuthOptions = {
 
                 try {
                     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://qr-token-verifer-server.vercel.app/api";
+                    console.log("Attempting login at:", `${apiUrl}/auth/login`);
+
                     const res = await fetch(`${apiUrl}/auth/login`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -36,7 +38,9 @@ export const authOptions: NextAuthOptions = {
                         })
                     });
 
+                    console.log("Login HTTP Status:", res.status);
                     const data = await res.json();
+                    console.log("Login Response Data:", data);
 
                     if (res.ok && data.user) {
                         return {
@@ -47,11 +51,13 @@ export const authOptions: NextAuthOptions = {
                             accessToken: data.token,
                         };
                     }
+                    console.error("Login failed on server side:", data.message || "Unknown error");
                     return null;
                 } catch (e) {
-                    console.error("Login failed:", e);
+                    console.error("Critical Login Error in Auth.ts:", e);
                     return null;
                 }
+
             }
         })
     ],

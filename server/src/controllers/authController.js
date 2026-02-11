@@ -16,10 +16,15 @@ exports.login = async (req, res) => {
         const envAdminId = process.env.ADMIN_ID;
         const envAdminPass = process.env.ADMIN_PASSWORD;
 
+        console.log(`Login attempt for ID: ${id}`);
+        console.log(`Checking against ENV: ${envAdminId ? 'ID is set' : 'ID IS MISSING'} - Pass: ${envAdminPass ? 'Pass is set' : 'Pass IS MISSING'}`);
+
         if (envAdminId && envAdminPass && id === envAdminId && password === envAdminPass) {
+            console.log("ENV Match found - proceeds to login");
             // Check if this admin is already in DB, if not, save it
             const existing = await db.select().from(admins).where(eq(admins.username, id)).limit(1);
             if (existing.length === 0) {
+
                 const hashedPassword = await bcrypt.hash(envAdminPass, 10);
                 await db.insert(admins).values({
                     username: envAdminId,
