@@ -10,11 +10,28 @@ const archiver = require('archiver');
 const { Readable } = require('stream');
 const nodemailer = require('nodemailer');
 
+// Configure Nodemailer for Gmail
+// Ensure process.env is loaded if accessed directly, though index.js should handle it.
+// require('dotenv').config(); 
+
 const transporter = nodemailer.createTransport({
-    service: 'gmail', // Or use standard smtp
+    service: 'gmail',
     auth: {
-        user: process.env.FROM_EMAIL || '',
-        pass: process.env.EMAIL_PASS || ''
+        user: process.env.FROM_EMAIL,
+        pass: process.env.EMAIL_PASS
+    }
+});
+
+// Verify connection configuration
+transporter.verify(function (error, success) {
+    if (error) {
+        console.log('Nodemailer Error:', error);
+        console.log('Email Config:', {
+            user: process.env.FROM_EMAIL ? 'Set' : 'Missing',
+            pass: process.env.EMAIL_PASS ? 'Set' : 'Missing'
+        });
+    } else {
+        console.log("Server is ready to take our messages");
     }
 });
 
