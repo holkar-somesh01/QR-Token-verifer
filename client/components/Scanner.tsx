@@ -177,7 +177,7 @@ export default function Scanner() {
             {/* Main Scanner Section */}
             <div className="w-full bg-slate-950 flex flex-col relative overflow-hidden">
                 {/* Header */}
-                <div className="px-8 py-6 flex items-center justify-between border-b border-white/5 bg-slate-900/40 backdrop-blur-md">
+                <div className="px-4 py-4 sm:px-8 sm:py-6 flex items-center justify-between border-b border-white/5 bg-slate-900/40 backdrop-blur-md">
                     <div className="flex items-center gap-4">
                         <div className="h-10 w-10 rounded-2xl bg-blue-600/10 flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
                             <Camera size={20} />
@@ -200,7 +200,7 @@ export default function Scanner() {
                 </div>
 
                 {/* Viewport Area */}
-                <div className="relative aspect-video sm:aspect-[16/9] bg-slate-950 flex items-center justify-center overflow-hidden">
+                <div className="relative aspect-square sm:aspect-video bg-slate-950 flex items-center justify-center overflow-hidden">
                     {/* Camera Viewport */}
                     <div id="reader" className={`w-full h-full [&>video]:!object-cover ${scanResult ? 'opacity-20 blur-2xl scale-110' : 'opacity-100'} transition-all duration-700`} />
 
@@ -225,7 +225,7 @@ export default function Scanner() {
 
                     {/* Result Overlay */}
                     {scanResult && (
-                        <div className="absolute inset-0 z-20 flex items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-500">
+                        <div className="absolute inset-0 z-20 flex items-center justify-center p-4 sm:p-8 animate-in fade-in zoom-in-95 duration-500">
                             <div className="w-full max-w-sm flex flex-col items-center">
                                 <div className={`mb-8 flex h-28 w-28 items-center justify-center rounded-[2.5rem] shadow-2xl transition-all border-2 ${isSuccess ? 'bg-blue-600 border-blue-400/50 text-white rotate-0' :
                                     isWarning ? 'bg-amber-500 border-amber-300/50 text-white rotate-12' :
@@ -237,7 +237,7 @@ export default function Scanner() {
                                 </div>
 
                                 <div className="text-center mb-8">
-                                    <h3 className="text-3xl font-bold text-white mb-3 tracking-tight">
+                                    <h3 className="text-2xl sm:text-3xl font-bold text-white mb-3 tracking-tight">
                                         {isSuccess ? 'Validated' :
                                             isWarning ? 'Duplicate Scan' : 'Auth Failed'}
                                     </h3>
@@ -295,7 +295,7 @@ export default function Scanner() {
                 </div>
 
                 {/* Interaction Strip */}
-                <div className="bg-slate-900 border-t border-white/5 p-6 flex flex-col sm:flex-row gap-4">
+                <div className="bg-slate-900 border-t border-white/5 p-4 sm:p-6 flex flex-col sm:flex-row gap-4">
                     <label className="flex-1 flex items-center justify-center gap-4 bg-slate-800 hover:bg-slate-700 text-white font-bold py-4 rounded-[1.25rem] transition-all cursor-pointer border border-white/5 group active:scale-[0.98]">
                         <input
                             type="file"
@@ -326,8 +326,8 @@ export default function Scanner() {
                     <button
                         onClick={() => scanning ? stopScanner() : startScanner()}
                         className={`px-8 py-4 rounded-[1.25rem] font-bold text-sm transition-all border ${scanning
-                                ? 'bg-rose-500/10 border-rose-500/20 text-rose-500 hover:bg-rose-500/20'
-                                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20'
+                            ? 'bg-rose-500/10 border-rose-500/20 text-rose-500 hover:bg-rose-500/20'
+                            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20'
                             }`}
                     >
                         {scanning ? 'Kill Stream' : 'Boot Sensor'}
@@ -337,7 +337,7 @@ export default function Scanner() {
 
             {/* Audit Logs Section (Clean White) */}
             <div className="w-full bg-white">
-                <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+                <div className="px-4 py-4 sm:px-8 sm:py-6 border-b border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
                             <History size={16} />
@@ -352,7 +352,7 @@ export default function Scanner() {
                 <div className="divide-y divide-slate-50 max-h-[300px] overflow-y-auto custom-scrollbar">
                     {statsData?.recentScans?.length > 0 ? (
                         statsData.recentScans.map((scan: any) => (
-                            <div key={scan.scanId} className="px-8 py-5 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+                            <div key={scan.scanId} className="px-4 py-4 sm:px-8 sm:py-5 flex items-center justify-between hover:bg-slate-50 transition-colors group">
                                 <div className="flex items-center gap-4">
                                     <div className="h-10 w-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 font-bold group-hover:bg-slate-900 group-hover:text-white transition-all shadow-sm border border-slate-100">
                                         {scan.userName?.[0] || '?'}

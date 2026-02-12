@@ -10,6 +10,9 @@ router.post('/import', verifyToken, upload.single('file'), qrController.importUs
 // Generate QR Codes (Protected)
 router.post('/generate', verifyToken, qrController.generateQRCodes);
 
+// Get QR Details (Public)
+router.get('/details/:token', qrController.getQRDetails);
+
 // Scan QR Code
 // Allowing public scan (or device-based) - Adjust if strict auth needed
 router.get('/scan/:token', qrController.scanQRCode);
@@ -29,6 +32,11 @@ router.delete('/history/:id', verifyToken, qrController.deleteScanRecord);
 
 // List Users (Protected)
 router.get('/users', verifyToken, qrController.getAllUsers);
+
+// CRUD Users (Protected)
+router.post('/users', verifyToken, qrController.createUser);
+router.put('/users/:id', verifyToken, qrController.updateUser);
+router.delete('/users/:id', verifyToken, qrController.deleteUser);
 
 // Send Email (Protected)
 router.post('/send-email', verifyToken, qrController.sendQRViaEmail);

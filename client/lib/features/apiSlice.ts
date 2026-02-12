@@ -71,6 +71,9 @@ export const apiSlice = createApi({
             query: () => '/qr/users',
             providesTags: ['Users'],
         }),
+        getQRDetails: builder.query<any, string>({
+            query: (token) => `/qr/details/${token}`,
+        }),
         importUsers: builder.mutation<any, FormData>({
             query: (body) => ({
                 url: '/qr/import',
@@ -112,6 +115,29 @@ export const apiSlice = createApi({
             }),
             invalidatesTags: ['Stats'],
         }),
+        addUser: builder.mutation<any, Partial<any>>({
+            query: (body) => ({
+                url: '/qr/users',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: ['Users', 'Stats'],
+        }),
+        updateUser: builder.mutation<any, { id: string } & Partial<any>>({
+            query: ({ id, ...body }) => ({
+                url: `/qr/users/${id}`,
+                method: 'PUT',
+                body,
+            }),
+            invalidatesTags: ['Users', 'Stats'],
+        }),
+        deleteUser: builder.mutation<any, { id: string }>({
+            query: ({ id }) => ({
+                url: `/qr/users/${id}`,
+                method: 'DELETE',
+            }),
+            invalidatesTags: ['Users', 'Stats'],
+        }),
     }),
 })
 
@@ -122,11 +148,15 @@ export const {
     useSendBulkEmailsMutation,
     useGetQRStatsQuery,
     useGetUsersQuery,
+    useGetQRDetailsQuery,
     useImportUsersMutation,
     useGenerateQRsMutation,
     useScanTokenMutation,
     useSendQRViaEmailMutation,
     useGetScanHistoryQuery,
-    useDeleteScanMutation
+    useDeleteScanMutation,
+    useAddUserMutation,
+    useUpdateUserMutation,
+    useDeleteUserMutation
 } = apiSlice
 

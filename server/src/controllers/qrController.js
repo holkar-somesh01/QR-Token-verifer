@@ -203,6 +203,42 @@ exports.generateQRCodes = async (req, res) => {
     }
 };
 
+// Get QR Details (Read-only)
+exports.getQRDetails = async (req, res) => {
+    try {
+        const { token } = req.params;
+
+        if (!token) {
+            return res.status(400).json({ error: 'Token is required' });
+        }
+
+        const qrRecord = await db.select().from(qrCodes).where(eq(qrCodes.token, token)).limit(1);
+
+        if (!qrRecord.length) {
+            return res.status(404).json({ valid: false, message: 'Invalid QR Code' });
+        }
+
+        const qr = qrRecord[0];
+        const user = await db.select().from(users).where(eq(users.id, qr.userId)).limit(1);
+
+        res.json({
+            valid: true,
+            status: qr.status,
+            user: user[0],
+            qr: {
+                token: qr.token,
+                createdAt: qr.createdAt,
+                expiresAt: qr.expiresAt,
+                usedAt: qr.usedAt
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // Validate and Scan QR
 exports.scanQRCode = async (req, res) => {
     try {
@@ -636,5 +672,88 @@ exports.getAllUsers = async (req, res) => {
         res.json(results);
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+};
+
+// Create User
+exports.createUser = async (req, res) => {
+    try {
+        const { studentId, fullName, email, mobile, class: className } = req.body;
+
+        if (!studentId || !fullName) {
+            return res.status(400).json({ error: "Student ID and Full Name are required" });
+        }
+
+        // Check availability
+        const existing = await db.select().from(users).where(eq(users.studentId, studentId)).limit(1);
+        if (existing.length > 0) {
+            return res.status(400).json({ error: "User with this Student ID already exists" });
+        }
+
+        await db.insert(users).values({
+            studentId,
+            fullName,
+            email: email || null,
+            mobile: mobile || null,
+            class: className || null
+        });
+
+        res.json({ message: "User created successfully" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Update User
+exports.updateUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { studentId, fullName, email, mobile, class: className } = req.body;
+
+        if (!id) return res.status(400).json({ error: "User ID required" });
+
+        await db.update(users).set({
+            studentId,
+            fullName,
+            email: email || null,
+            mobile: mobile || null,
+            class: className || null
+        }).where(eq(users.id, Number(id)));
+
+        res.json({ message: "User updated successfully" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Delete User
+exports.deleteUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id) return res.status(400).json({ error: "User ID required" });
+
+        const userId = Number(id);
+
+        // First delete related QR codes and scans
+        // 1. Get QR ID
+        const qr = await db.select().from(qrCodes).where(eq(qrCodes.userId, userId)).limit(1);
+
+        if (qr.length > 0) {
+            // Delete Scans
+            await db.delete(qrScans).where(eq(qrScans.qrId, qr[0].id));
+            // Delete QR
+            await db.delete(qrCodes).where(eq(qrCodes.id, qr[0].id));
+        }
+
+        // Delete User
+        await db.delete(users).where(eq(users.id, userId));
+
+        res.json({ message: "User deleted successfully" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: error.message });
     }
 };

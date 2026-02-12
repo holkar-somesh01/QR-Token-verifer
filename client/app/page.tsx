@@ -82,7 +82,7 @@ export default function Home() {
 
         {/* Scanner Modal Pop-up */}
         {showScanner && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center sm:p-4">
             {/* Backdrop */}
             <div
               className="absolute inset-0 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-500"
@@ -90,7 +90,7 @@ export default function Home() {
             />
 
             {/* Modal Content */}
-            <div className="relative w-full max-w-xl bg-white rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-12 duration-500 ease-out border border-white/20 max-h-[90vh] flex flex-col">
+            <div className="relative w-full h-full sm:h-auto sm:max-w-xl bg-white sm:rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-12 duration-500 ease-out border border-white/20 sm:max-h-[90vh] flex flex-col">
               {/* Header with Close Button */}
               <div className="absolute top-4 right-4 z-[110]">
                 <button
