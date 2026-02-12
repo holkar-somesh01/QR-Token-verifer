@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
-import { useGetUsersQuery, useImportUsersMutation, useGenerateQRsMutation, useSendQRViaEmailMutation, useSendBulkEmailsMutation } from '@/lib/features/apiSlice';
+import { useGetUsersQuery, useImportUsersMutation, useGenerateQRsMutation, useSendQRViaEmailMutation, useSendBulkEmailsMutation, useAddUserMutation, useUpdateUserMutation, useDeleteUserMutation } from '@/lib/features/apiSlice';
 import { useSession } from 'next-auth/react';
-import { Loader2, Upload, QrCode, Download, Search, CheckCircle, XCircle, FileSpreadsheet, RefreshCw, Mail, MessageSquare, ExternalLink, LayoutGrid, Table as TableIcon, MoreVertical, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Loader2, Upload, QrCode, Download, Search, CheckCircle, XCircle, FileSpreadsheet, RefreshCw, Mail, MessageSquare, ExternalLink, LayoutGrid, Table as TableIcon, MoreVertical, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight, Plus, Pencil, Trash2, X } from 'lucide-react';
 import Image from 'next/image';
 
 export default function UsersPage() {
@@ -13,14 +13,35 @@ export default function UsersPage() {
     const [generateQRs, { isLoading: isGenerating }] = useGenerateQRsMutation();
     const [sendEmail, { isLoading: isSendingEmail }] = useSendQRViaEmailMutation();
     const [sendBulkEmails, { isLoading: isSendingBulk }] = useSendBulkEmailsMutation();
+    const [addUser, { isLoading: isAdding }] = useAddUserMutation();
+    const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
+    const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
+
+    const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<any>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    // Form State
+    const [formData, setFormData] = useState({
+        fullName: '',
+        studentId: '',
+        email: '',
+        mobile: '',
+        class: ''
+    });
 
     const [searchTerm, setSearchTerm] = useState('');
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]); // Student IDs
+
+    // Modals
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+    // Data & Ops
     const [file, setFile] = useState<File | null>(null);
     const [sendingId, setSendingId] = useState<string | null>(null);
 
+    // Pagination & Sort
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(12);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'fullName', direction: 'asc' });
@@ -189,6 +210,54 @@ export default function UsersPage() {
         }
     };
 
+    const handleOpenAddUser = () => {
+        setEditingUser(null);
+        setFormData({ fullName: '', studentId: '', email: '', mobile: '', class: '' });
+        setIsUserModalOpen(true);
+    };
+
+    const handleOpenEditUser = (user: any) => {
+        setEditingUser(user);
+        setFormData({
+            fullName: user.fullName || '',
+            studentId: user.studentId || '',
+            email: user.email || '',
+            mobile: user.mobile || '',
+            class: user.class || ''
+        });
+        setIsUserModalOpen(true);
+    };
+
+    const handleSaveUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            if (editingUser) {
+                await updateUser({ id: editingUser.id, ...formData }).unwrap();
+                alert('User updated successfully');
+            } else {
+                await addUser(formData).unwrap();
+                alert('User created successfully');
+            }
+            setIsUserModalOpen(false);
+            refetch();
+        } catch (err: any) {
+            alert(`Error: ${err.data?.error || err.message}`);
+        }
+    };
+
+    const handleDeleteUser = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
+        setDeletingId(id);
+        try {
+            await deleteUser({ id }).unwrap();
+            refetch();
+        } catch (err: any) {
+            alert(`Delete failed: ${err.data?.error || err.message}`);
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
     if (isLoading) return <div className="flex h-screen w-full items-center justify-center bg-gray-50"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
 
     return (
@@ -208,6 +277,13 @@ export default function UsersPage() {
                 {/* Unified Action Bar */}
                 <div className="official-card bg-white p-2.5 flex flex-col xl:flex-row items-center gap-3 shadow-xl shadow-slate-200/40">
                     <div className="flex w-full xl:w-auto gap-2">
+                        <button
+                            onClick={handleOpenAddUser}
+                            className="flex-1 xl:flex-none inline-flex items-center justify-center px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 transition-all active:scale-95 uppercase tracking-wider"
+                        >
+                            <Plus className="mr-2 h-4 w-4 text-slate-500" />
+                            Add Entity
+                        </button>
                         <button
                             onClick={() => setIsImportModalOpen(true)}
                             className="flex-1 xl:flex-none inline-flex items-center justify-center px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 transition-all active:scale-95 uppercase tracking-wider"
@@ -389,8 +465,20 @@ export default function UsersPage() {
                                                                 </button>
                                                             </>
                                                         )}
-                                                        <button className="h-9 w-9 flex items-center justify-center border border-slate-200 rounded-lg text-slate-400 hover:text-slate-900 transition-all">
-                                                            <MoreVertical size={16} />
+                                                        <button
+                                                            onClick={() => handleOpenEditUser(user)}
+                                                            className="h-9 w-9 flex items-center justify-center border border-slate-200 rounded-lg text-slate-400 hover:text-amber-600 hover:border-amber-200 hover:bg-amber-50 transition-all"
+                                                            title="Edit User"
+                                                        >
+                                                            <Pencil size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteUser(user.id)}
+                                                            disabled={deletingId === user.id}
+                                                            className="h-9 w-9 flex items-center justify-center border border-slate-200 rounded-lg text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all disabled:opacity-50"
+                                                            title="Delete User"
+                                                        >
+                                                            {deletingId === user.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 size={16} />}
                                                         </button>
                                                     </div>
                                                 </td>
@@ -467,14 +555,32 @@ export default function UsersPage() {
                                                 </button>
                                             </div>
                                         ) : (
-                                            <button
-                                                onClick={() => handleGenerateQR([user.studentId])}
-                                                disabled={isGenerating}
-                                                className="w-full py-3.5 rounded-2xl text-[11px] font-bold bg-slate-900 text-white hover:bg-black transition-all shadow-xl shadow-slate-200 mt-2 active:scale-95 uppercase tracking-wider"
-                                            >
-                                                Initialize Protocol
-                                            </button>
+                                            <div className="grid grid-cols-2 gap-3 pt-6 border-t border-slate-50">
+                                                <button
+                                                    onClick={() => handleGenerateQR([user.studentId])}
+                                                    disabled={isGenerating}
+                                                    className="col-span-2 w-full py-3.5 rounded-2xl text-[11px] font-bold bg-slate-900 text-white hover:bg-black transition-all shadow-xl shadow-slate-200 active:scale-95 uppercase tracking-wider"
+                                                >
+                                                    Initialize Protocol
+                                                </button>
+                                            </div>
                                         )}
+
+                                        {/* Edit/Delete Overlay */}
+                                        <div className="absolute top-4 right-4 flex flex-col gap-2 translate-x-12 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-300">
+                                            <button
+                                                onClick={() => handleOpenEditUser(user)}
+                                                className="h-8 w-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:border-amber-200 flex items-center justify-center shadow-sm"
+                                            >
+                                                <Pencil size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteUser(user.id)}
+                                                className="h-8 w-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 flex items-center justify-center shadow-sm"
+                                            >
+                                                {deletingId === user.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 size={14} />}
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -563,6 +669,113 @@ export default function UsersPage() {
                                 {isImporting && <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />}
                                 {isImporting ? 'Processing Data...' : 'Initiate Import'}
                             </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Add/Edit User Modal */}
+            {isUserModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[2rem] shadow-2xl max-w-lg w-full p-8 relative overflow-hidden ring-1 ring-white/20">
+                        <div className="absolute top-0 right-0 p-6 opacity-[0.03] pointer-events-none">
+                            <Plus size={120} />
+                        </div>
+
+                        <div className="flex items-center justify-between mb-8 relative z-10">
+                            <div>
+                                <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
+                                    {editingUser ? 'Update Entity' : 'New Entity'}
+                                </h3>
+                                <p className="text-sm text-slate-500 font-medium">
+                                    {editingUser ? 'Modify existing personnel record details.' : 'Manually provision a new user in the database.'}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setIsUserModalOpen(false)}
+                                className="h-10 w-10 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center transition-all"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveUser} className="space-y-5 relative z-10">
+                            <div className="grid grid-cols-2 gap-5">
+                                <div className="space-y-2">
+                                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Full Name</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="e.g. John Doe"
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-300"
+                                        value={formData.fullName}
+                                        onChange={e => setFormData({ ...formData, fullName: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Student ID</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="e.g. 2023001"
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-300"
+                                        value={formData.studentId}
+                                        onChange={e => setFormData({ ...formData, studentId: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Email Address</label>
+                                <input
+                                    type="email"
+                                    placeholder="e.g. john@example.com"
+                                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-300"
+                                    value={formData.email}
+                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-5">
+                                <div className="space-y-2">
+                                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Mobile Number</label>
+                                    <input
+                                        type="tel"
+                                        placeholder="e.g. 9876543210"
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-300"
+                                        value={formData.mobile}
+                                        onChange={e => setFormData({ ...formData, mobile: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Department / Class</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. BCA-I"
+                                        className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-300"
+                                        value={formData.class}
+                                        onChange={e => setFormData({ ...formData, class: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="pt-4 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsUserModalOpen(false)}
+                                    className="flex-1 px-6 py-3.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm bg-white hover:bg-slate-50 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isAdding || isUpdating}
+                                    className="flex-[2] px-6 py-3.5 rounded-xl text-white font-bold text-sm bg-blue-600 hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2 active:scale-[0.98]"
+                                >
+                                    {(isAdding || isUpdating) && <Loader2 className="h-4 w-4 animate-spin" />}
+                                    {editingUser ? 'Save Modifications' : 'Provision User'}
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>

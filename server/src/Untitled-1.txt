@@ -1,3 +1,0 @@
-# 
-
-{"status":"ok","database":"Connected","admin_id":"Set","admin_pass":"Set","node_env":"production"}
