@@ -121,7 +121,7 @@ exports.importUsersFromFile = async (req, res) => {
 
         const workbook = XLSX.readFile(req.file.path);
         const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-        
+
         const { insertedUsers, errors } = await processImportData(data);
         fs.unlinkSync(req.file.path);
 
@@ -192,7 +192,7 @@ exports.getQRDetails = async (req, res) => {
 
         const user = userRecord[0];
         const status = await db.select().from(mealStatus).where(eq(mealStatus.userId, user.id)).limit(1).then(rows => rows[0]);
-        
+
         // Determine Next Meal
         let nextMeal = null;
         let warning = null;
@@ -253,7 +253,7 @@ exports.getQRDetails = async (req, res) => {
 // Scan and Approve QR
 exports.scanQRCode = async (req, res) => {
     try {
-        const token = req.params.token || req.body.token; 
+        const token = req.params.token || req.body.token;
         const { scannedBy } = req.body;
         const userId = parseInt(token);
 
@@ -327,7 +327,7 @@ exports.scanQRCode = async (req, res) => {
 exports.getStats = async (req, res) => {
     try {
         const totalUsers = await db.select({ count: count() }).from(users);
-        
+
         // Meal served stats
         const d1b = await db.select({ count: count() }).from(mealStatus).where(eq(mealStatus.day1Breakfast, 'used'));
         const d1l = await db.select({ count: count() }).from(mealStatus).where(eq(mealStatus.day1Lunch, 'used'));
@@ -473,7 +473,7 @@ exports.sendBulkQRViaEmail = async (req, res) => {
         for (const user of targetUsers) {
             try {
                 const qrBuffer = await QRCode.toBuffer(String(user.id));
-                
+
                 // Placeholder replacement
                 const finalSubject = (subject || 'Your Food Access QR Code').replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
                 const finalBody = (body || `<h2>Hello {name},</h2><p>Your meal QR code is attached.</p>`).replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
@@ -518,8 +518,8 @@ exports.getAllUsers = async (req, res) => {
                 day2Lunch: mealStatus.day2Lunch,
             }
         })
-        .from(users)
-        .leftJoin(mealStatus, eq(users.id, mealStatus.userId));
+            .from(users)
+            .leftJoin(mealStatus, eq(users.id, mealStatus.userId));
 
         res.json(usersList);
     } catch (err) {
@@ -531,22 +531,22 @@ exports.getAllUsers = async (req, res) => {
 exports.createUser = async (req, res) => {
     try {
         const { name, email, mobile, expoId, participantType, mealStatus: mealState } = req.body;
-        
+
         // Transaction for consistency
         await db.transaction(async (tx) => {
-            const inserted = await tx.insert(users).values({ 
-                name, email, mobile, expoId, 
+            const inserted = await tx.insert(users).values({
+                name, email, mobile, expoId,
                 participantType: participantType || 'normal',
                 status: req.body.status || 'active'
             }).returning({ id: users.id });
-            
+
             const userId = inserted[0].id;
-            
+
             // Set QR Code (using ID as string)
             await tx.update(users).set({ qrCode: String(userId) }).where(eq(users.id, userId));
-            
+
             // Initialize Meal Status
-            await tx.insert(mealStatus).values({ 
+            await tx.insert(mealStatus).values({
                 userId,
                 day1Breakfast: mealState?.day1Breakfast || 'not_used',
                 day1Lunch: mealState?.day1Lunch || 'not_used',
@@ -582,7 +582,7 @@ exports.updateUser = async (req, res) => {
 
         await db.transaction(async (tx) => {
             // Update Core User Info
-            await tx.update(users).set({ 
+            await tx.update(users).set({
                 name, email, mobile, expoId, participantType,
                 status: req.body.status
             }).where(eq(users.id, userId));
@@ -602,7 +602,7 @@ exports.updateUser = async (req, res) => {
                 if (mealState.day1Lunch === 'used') count++;
                 if (mealState.day2Breakfast === 'used') count++;
                 if (mealState.day2Lunch === 'used') count++;
-                
+
                 await tx.update(users).set({ totalScans: count }).where(eq(users.id, userId));
             }
         });
