@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import jsQR from "jsqr";
-import { Loader2, Camera, XCircle, CheckCircle, AlertTriangle, ScanLine, RotateCcw, History, Upload, User, Smartphone, Calendar, Hash, ArrowRight } from "lucide-react";
+import { Loader2, Camera, XCircle, CheckCircle, AlertTriangle, ScanLine, RotateCcw, History, Upload, User, Smartphone, Calendar, Hash, ArrowRight, RefreshCw } from "lucide-react";
 import { useScanQRMutation, useGetQRDetailsQuery, useGetStatsQuery } from "@/lib/features/apiSlice";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -67,7 +67,7 @@ export default function Scanner() {
                 (decodedText) => {
                     handleDecodedToken(decodedText);
                 },
-                () => {}
+                () => { }
             );
         } catch (err) {
             console.error(err);
@@ -96,9 +96,9 @@ export default function Scanner() {
     const handleApprove = async () => {
         if (!scannedId) return;
         try {
-            await approveScan({ 
-                token: scannedId, 
-                scannedBy: session?.user?.name || 'admin' 
+            await approveScan({
+                token: scannedId,
+                scannedBy: session?.user?.name || 'admin'
             }).unwrap();
             // Optional: You could add a temporary success state here
             resetScanner();
@@ -125,7 +125,7 @@ export default function Scanner() {
             </div>
 
             {/* Top Bar / Brand */}
-            <div className="relative z-10 p-6 flex items-center justify-between pointer-events-none">
+            <div className="relative z-40 p-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-500/20">
                         <ScanLine size={20} />
@@ -135,23 +135,32 @@ export default function Scanner() {
                         <p className="text-white/40 text-[10px] uppercase font-bold tracking-widest mt-1">Sequential Sync Active</p>
                     </div>
                 </div>
+                <button
+                    onClick={() => {
+                        if (scannedId) refetchDetails();
+                        refetchStats();
+                    }}
+                    className="p-3 bg-white/5 hover:bg-white/10 text-white/50 hover:text-white rounded-xl transition-all hover:rotate-180 duration-500"
+                >
+                    <RefreshCw size={18} className={(detailsLoading) ? 'animate-spin' : ''} />
+                </button>
             </div>
 
             {/* Scanning Overlay (Central Focus) */}
             {!scannedId && (
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none p-4">
                     <div className="relative w-full max-w-[280px] aspect-square sm:w-72 sm:h-72">
-                         {/* Corner Borders */}
-                         <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl-2xl"></div>
-                         <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr-2xl"></div>
-                         <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-blue-500 rounded-bl-2xl"></div>
-                         <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-blue-500 rounded-br-2xl"></div>
-                         
-                         <div className="absolute inset-4 border border-white/10 rounded-xl overflow-hidden">
-                             <div className="w-full h-full bg-gradient-to-b from-blue-500/0 via-blue-500/20 to-blue-500/0 animate-scan relative">
+                        {/* Corner Borders */}
+                        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl-2xl"></div>
+                        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr-2xl"></div>
+                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-blue-500 rounded-bl-2xl"></div>
+                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-blue-500 rounded-br-2xl"></div>
+
+                        <div className="absolute inset-4 border border-white/10 rounded-xl overflow-hidden">
+                            <div className="w-full h-full bg-gradient-to-b from-blue-500/0 via-blue-500/20 to-blue-500/0 animate-scan relative">
                                 <div className="absolute top-1/2 w-full h-[1px] bg-blue-400 shadow-[0_0_15px_rgba(59,130,246,1)]"></div>
-                             </div>
-                         </div>
+                            </div>
+                        </div>
                     </div>
                     <p className="mt-8 text-white/60 font-black uppercase tracking-[0.3em] text-[10px] animate-pulse text-center">Scanning for Participant Code</p>
                 </div>
@@ -197,21 +206,21 @@ export default function Scanner() {
                         )}
 
                         <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8">
-                             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100 dark:border-white/5">
+                            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100 dark:border-white/5">
                                 <p className="text-[8px] sm:text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-2 sm:mb-3">Expected</p>
                                 <p className={`text-sm sm:text-xl font-black uppercase tracking-tighter ${details.nextMeal === "All Meals Finished" ? "text-rose-500" : "text-blue-600"}`}>
-                                    {details.nextMeal === "Day1 Breakfast" ? "D1 B-fast" : 
-                                     details.nextMeal === "Day1 Lunch" ? "D1 Lunch" :
-                                     details.nextMeal === "Day2 Breakfast" ? "D2 B-fast" :
-                                     details.nextMeal === "Day2 Lunch" ? "D2 Lunch" : details.nextMeal}
+                                    {details.nextMeal === "Day1 Breakfast" ? "D1 B-fast" :
+                                        details.nextMeal === "Day1 Lunch" ? "D1 Lunch" :
+                                            details.nextMeal === "Day2 Breakfast" ? "D2 B-fast" :
+                                                details.nextMeal === "Day2 Lunch" ? "D2 Lunch" : details.nextMeal}
                                 </p>
-                             </div>
-                             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100 dark:border-white/5">
+                            </div>
+                            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100 dark:border-white/5">
                                 <p className="text-[8px] sm:text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-2 sm:mb-3">Audit</p>
                                 <p className="text-sm sm:text-xl font-black uppercase tracking-tighter text-slate-900 dark:text-white">
                                     {details.scanCount}<span className="text-slate-300 dark:text-slate-700 mx-1">/</span>{details.user.participantType === 'poster' ? 2 : 4}
                                 </p>
-                             </div>
+                            </div>
                         </div>
 
                         <div className="space-y-1.5 sm:space-y-2 mb-8 h-28 sm:h-32 overflow-y-auto pr-2 custom-scrollbar">

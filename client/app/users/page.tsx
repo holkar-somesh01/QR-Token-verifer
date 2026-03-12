@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
 import { useGetUsersQuery, useImportUsersMutation, useGenerateQRsMutation, useSendQRViaEmailMutation, useSendBulkEmailsMutation, useAddUserMutation, useUpdateUserMutation, useDeleteUserMutation, useImportGoogleSheetMutation } from '@/lib/features/apiSlice';
 import { useSession } from 'next-auth/react';
-import { Loader2, Upload, QrCode, Download, Search, CheckCircle, XCircle, FileSpreadsheet, Mail, MessageSquare, LayoutGrid, Table as TableIcon, Pencil, Trash2, X, Plus, Utensils, Coffee, UserCircle, ChevronLeft, ChevronRight, Globe, AlertTriangle } from 'lucide-react';
+import { Loader2, Upload, QrCode, Download, Search, CheckCircle, XCircle, FileSpreadsheet, Mail, MessageSquare, LayoutGrid, Table as TableIcon, Pencil, Trash2, X, Plus, Utensils, Coffee, UserCircle, ChevronLeft, ChevronRight, Globe, AlertTriangle, RefreshCw } from 'lucide-react';
 
 export default function UsersPage() {
     const { data: session } = useSession();
@@ -24,6 +24,7 @@ export default function UsersPage() {
     // Form State
     const [formData, setFormData] = useState({
         name: '',
+        email: '',
         expoId: '',
         participantType: 'normal',
         status: 'active',
@@ -49,6 +50,11 @@ export default function UsersPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(12);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+
+    // Email Templates
+    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+    const [emailSubject, setEmailSubject] = useState('Your Food Access QR Code');
+    const [emailBody, setEmailBody] = useState('<h2>Hello {name},</h2><p>Your meal QR code for Expo is attached below.</p><p>Please keep this QR safe as it is required for all meal check-ins.</p>');
 
     useEffect(() => {
         setIsMounted(true);
@@ -134,6 +140,7 @@ export default function UsersPage() {
         setEditingUser(user);
         setFormData({
             name: user.name || '',
+            email: user.email || '',
             expoId: user.expoId || '',
             participantType: user.participantType || 'normal',
             status: user.status || 'active',
@@ -149,7 +156,11 @@ export default function UsersPage() {
 
     const handleSendEmail = async (userId: string) => {
         try {
-            await sendEmail({ userId }).unwrap();
+            await sendEmail({ 
+                userId, 
+                subject: emailSubject, 
+                body: emailBody 
+            }).unwrap();
             alert("QR Code sent to user's registered email.");
         } catch (err: any) {
             alert("Email failed: " + (err.data?.message || err.message));
@@ -159,7 +170,11 @@ export default function UsersPage() {
     const handleSendBulk = async () => {
         if (!confirm(`Distribute QR Codes to ${selectedUsers.length > 0 ? selectedUsers.length : 'ALL'} participants via email?`)) return;
         try {
-            await sendBulkEmails({ userIds: selectedUsers.length > 0 ? selectedUsers : 'all' }).unwrap();
+            await sendBulkEmails({ 
+                userIds: selectedUsers.length > 0 ? selectedUsers : 'all',
+                subject: emailSubject,
+                body: emailBody
+            }).unwrap();
             alert("Bulk distribution initiated.");
         } catch (err: any) {
             alert("Bulk failed: " + (err.data?.message || err.message));
@@ -215,8 +230,11 @@ export default function UsersPage() {
 
                 <div className="flex flex-col xl:flex-row gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-[2rem] sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl">
                     <div className="grid grid-cols-2 lg:flex gap-2 sm:gap-3 w-full xl:w-auto">
-                        <button onClick={() => { setEditingUser(null); setFormData({ name: '', expoId: '', participantType: 'normal', status: 'active', mealStatus: { day1Breakfast: 'not_used', day1Lunch: 'not_used', day2Breakfast: 'not_used', day2Lunch: 'not_used' } }); setIsUserModalOpen(true); }} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-slate-900 dark:bg-slate-800 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-1.5 sm:gap-2">
+                        <button onClick={() => { setEditingUser(null); setFormData({ name: '', email:'', expoId: '', participantType: 'normal', status: 'active', mealStatus: { day1Breakfast: 'not_used', day1Lunch: 'not_used', day2Breakfast: 'not_used', day2Lunch: 'not_used' } }); setIsUserModalOpen(true); }} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-slate-900 dark:bg-slate-800 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-1.5 sm:gap-2">
                              <Plus size={12} className="sm:size-[14px]" /> <span className="truncate">Add User</span>
+                        </button>
+                        <button onClick={() => refetch()} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 hover:text-blue-500 transition-all hover:rotate-180 duration-500" title="Refresh User List">
+                             <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
                         </button>
                         <button onClick={() => setIsImportModalOpen(true)} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-slate-700 dark:text-slate-300">
                              <FileSpreadsheet size={12} className="text-emerald-500 sm:size-[14px]" /> <span className="truncate">Import</span>
@@ -224,8 +242,11 @@ export default function UsersPage() {
                         <button onClick={() => handleGenerateQR(selectedUsers.length > 0 ? selectedUsers : 'all')} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-blue-600 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg shadow-blue-500/20">
                              <QrCode size={12} className="sm:size-[14px]" /> <span className="truncate">Issue QR</span>
                         </button>
-                        <button onClick={handleSendBulk} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-slate-700 dark:text-slate-300">
+                        <button onClick={() => handleSendBulk()} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-slate-700 dark:text-slate-300">
                              <Mail size={12} className="text-blue-500 sm:size-[14px]" /> <span className="truncate">Invites</span>
+                        </button>
+                        <button onClick={() => setIsEmailModalOpen(true)} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 hover:text-blue-500 transition-all" title="Email Settings">
+                             <MessageSquare size={18} />
                         </button>
                     </div>
                     <div className="relative flex-1 w-full">
@@ -265,7 +286,10 @@ export default function UsersPage() {
                                                     <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-slate-400 uppercase">{user.name?.[0]}</div>
                                                     <div>
                                                         <p className="text-sm font-bold text-slate-900 dark:text-white">{user.name}</p>
-                                                        <p className="text-[10px] font-mono text-slate-400 uppercase">{user.expoId || 'no_id'}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-[10px] font-mono text-slate-400 uppercase">{user.expoId || 'no_id'}</p>
+                                                            {user.email && <span className="text-[10px] text-blue-500 font-medium lowercase">({user.email})</span>}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -313,7 +337,10 @@ export default function UsersPage() {
                                          <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${user.participantType === 'poster' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>{user.participantType}</div>
                                     </div>
                                     <h3 className="font-bold text-slate-900 dark:text-white line-clamp-1">{user.name}</h3>
-                                    <p className="text-[10px] font-mono text-slate-400 uppercase mb-6">{user.expoId || 'no_id'}</p>
+                                    <div className="flex flex-col mb-6">
+                                        <p className="text-[10px] font-mono text-slate-400 uppercase">{user.expoId || 'no_id'}</p>
+                                        <p className="text-[10px] text-blue-500/70 font-medium lowercase truncate">{user.email || 'no email set'}</p>
+                                    </div>
                                     <div className="flex gap-2 mb-6">
                                          <MealPip status={user.mealStatus?.day1Breakfast} label="D1B" />
                                          <MealPip status={user.mealStatus?.day1Lunch} label="D1L" />
@@ -359,12 +386,16 @@ export default function UsersPage() {
                                     <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" placeholder="e.g. Somesh Holkar" />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Expo Identifier</label>
-                                    <input required value={formData.expoId} onChange={e => setFormData({...formData, expoId: e.target.value})} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" placeholder="EXPO-2026-X" />
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Address</label>
+                                    <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" placeholder="e.g. user@gmail.com" />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Expo Identifier</label>
+                                    <input required value={formData.expoId} onChange={e => setFormData({...formData, expoId: e.target.value})} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" placeholder="EXPO-2026-X" />
+                                </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Allocation Type</label>
                                     <div className="flex gap-3 sm:gap-4">
@@ -375,6 +406,7 @@ export default function UsersPage() {
                                         ))}
                                     </div>
                                 </div>
+                            </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Security Status</label>
                                     <div className="flex gap-3 sm:gap-4">
@@ -387,7 +419,6 @@ export default function UsersPage() {
                                                 {st.label}
                                             </button>
                                         ))}
-                                    </div>
                                 </div>
                             </div>
 
@@ -462,6 +493,64 @@ export default function UsersPage() {
                          </div>
                     </div>
                  </div>
+            )}
+            {/* Email Settings Modal */}
+            {isEmailModalOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[3rem] p-10 shadow-2xl border border-white/10">
+                        <div className="flex justify-between items-start mb-8">
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Email Template</h3>
+                                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Customize the QR distribution message.</p>
+                            </div>
+                            <button onClick={() => setIsEmailModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 transition-colors"><XCircle size={32} strokeWidth={1} /></button>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Subject Line</label>
+                                <input 
+                                    value={emailSubject} 
+                                    onChange={e => setEmailSubject(e.target.value)}
+                                    className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" 
+                                    placeholder="e.g. Your Expo QR Code"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Body (HTML Supported)</label>
+                                    <div className="flex gap-2">
+                                        <span className="text-[9px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-black uppercase">{"{name}"}</span>
+                                        <span className="text-[9px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-black uppercase">{"{expoId}"}</span>
+                                    </div>
+                                </div>
+                                <textarea 
+                                    value={emailBody} 
+                                    onChange={e => setEmailBody(e.target.value)}
+                                    rows={8}
+                                    className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none resize-none" 
+                                    placeholder="Write your email content here..."
+                                />
+                            </div>
+
+                            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Live Preview (Personalized)</p>
+                                <div className="text-xs text-slate-600 dark:text-slate-300">
+                                    <p className="font-bold text-slate-900 dark:text-white mb-2">Subject: {emailSubject.replace(/{name}/g, 'Somesh').replace(/{expoId}/g, 'EXPO-001')}</p>
+                                    <div dangerouslySetInnerHTML={{ __html: emailBody.replace(/{name}/g, 'Somesh').replace(/{expoId}/g, 'EXPO-001') }} />
+                                    <div className="mt-4 p-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center text-[9px] text-slate-400 font-bold uppercase">
+                                        [ QR Code Image Attachment ]
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button onClick={() => setIsEmailModalOpen(false)} className="w-full py-5 rounded-2xl bg-slate-900 dark:bg-white dark:text-slate-900 text-white font-black uppercase tracking-widest text-xs hover:opacity-90 transition-all shadow-xl">
+                                Save Template
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

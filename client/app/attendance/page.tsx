@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useGetScanHistoryQuery, useDeleteScanMutation } from "@/lib/features/apiSlice";
 import { useSession } from "next-auth/react";
 import Navbar from "@/components/Navbar";
-import { Loader2, Calendar, Clock, Search, Download, Filter, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight, Trash2, MoreHorizontal, CheckCircle, Copy, Utensils, Coffee } from "lucide-react";
+import { Loader2, Calendar, Clock, Search, Download, Filter, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight, Trash2, MoreHorizontal, CheckCircle, Copy, Utensils, Coffee, RefreshCw } from "lucide-react";
 import { useState, useMemo } from "react";
 
 export default function AttendancePage() {
@@ -87,17 +87,22 @@ export default function AttendancePage() {
                         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Scan <span className="text-slate-400">Master Ledger</span></h1>
                         <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Audit trail for all food distribution events.</p>
                     </div>
-                    <button onClick={() => {
-                         const csv = "Name,ExpoId,MealType,Time,ScannedBy\n" + processedHistory.map((h:any) => `"${h.userName}","${h.expoId}","${h.mealType}","${h.scanTime}","${h.scannedBy}"`).join("\n");
-                         const blob = new Blob([csv], { type: 'text/csv' });
-                         const url = window.URL.createObjectURL(blob);
-                         const a = document.createElement('a');
-                         a.href = url;
-                         a.download = 'meal_logs.csv';
-                         a.click();
-                    }} className="w-full sm:w-auto px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-                        <Download size={14} /> <span className="sm:inline">Export CSV</span>
-                    </button>
+                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                        <button onClick={() => refetch()} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 hover:text-blue-500 transition-all hover:rotate-180 duration-500" title="Sync Ledger">
+                            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+                        </button>
+                        <button onClick={() => {
+                            const csv = "Name,ExpoId,MealType,Time,ScannedBy\n" + processedHistory.map((h:any) => `"${h.userName}","${h.expoId}","${h.mealType}","${h.scanTime}","${h.scannedBy}"`).join("\n");
+                            const blob = new Blob([csv], { type: 'text/csv' });
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'meal_logs.csv';
+                            a.click();
+                        }} className="flex-1 sm:flex-none px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
+                            <Download size={14} /> <span className="sm:inline">Export CSV</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex gap-3 items-center">

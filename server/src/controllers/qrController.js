@@ -429,7 +429,7 @@ exports.downloadQRs = async (req, res) => {
 // Send QR via Email
 exports.sendQRViaEmail = async (req, res) => {
     try {
-        const { userId } = req.body;
+        const { userId, subject, body } = req.body;
         const user = await db.select().from(users).where(eq(users.id, userId)).limit(1).then(rows => rows[0]);
         if (!user || !user.email) return res.status(404).json({ error: "User or email not found" });
 
@@ -438,17 +438,22 @@ exports.sendQRViaEmail = async (req, res) => {
             errorCorrectionLevel: 'H', margin: 1, width: 300
         });
 
+        // Placeholder replacement
+        const finalSubject = (subject || 'Your Food Access QR Code').replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
+        const finalBody = (body || `<h2>Hello {name},</h2><p>Your meal QR code is attached.</p>`).replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
+
         const transporter = getTransporter();
         await transporter.sendMail({
             from: process.env.FROM_EMAIL,
             to: user.email,
-            subject: 'Your Food Access QR Code',
-            html: `<h2>Hello ${user.name},</h2><p>Your meal QR code is attached.</p>`,
+            subject: finalSubject,
+            html: `${finalBody}<br/><img src="cid:qr"/>`,
             attachments: [{ filename: 'qrcode.png', content: qrBuffer, cid: 'qr' }]
         });
 
         res.json({ message: `Email sent to ${user.email}` });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -456,7 +461,7 @@ exports.sendQRViaEmail = async (req, res) => {
 // Send Bulk Emails
 exports.sendBulkQRViaEmail = async (req, res) => {
     try {
-        const { userIds } = req.body;
+        const { userIds, subject, body } = req.body;
         let targetUsers = await db.select().from(users).where(sql`${users.email} IS NOT NULL`);
         if (userIds && userIds !== 'all') {
             targetUsers = targetUsers.filter(u => userIds.includes(u.id));
@@ -468,20 +473,27 @@ exports.sendBulkQRViaEmail = async (req, res) => {
         for (const user of targetUsers) {
             try {
                 const qrBuffer = await QRCode.toBuffer(String(user.id));
+                
+                // Placeholder replacement
+                const finalSubject = (subject || 'Your Food Access QR Code').replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
+                const finalBody = (body || `<h2>Hello {name},</h2><p>Your meal QR code is attached.</p>`).replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
+
                 await transporter.sendMail({
                     from: process.env.FROM_EMAIL,
                     to: user.email,
-                    subject: 'Your Food Access QR Code',
-                    html: `<h2>Hello ${user.name},</h2><p>Your meal QR code is attached.</p>`,
+                    subject: finalSubject,
+                    html: `${finalBody}<br/><img src="cid:qr"/>`,
                     attachments: [{ filename: 'qrcode.png', content: qrBuffer, cid: 'qr' }]
                 });
                 results.sent++;
             } catch (err) {
+                console.error(`Failed to send to ${user.email}:`, err);
                 results.failed++;
             }
         }
         res.json(results);
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: error.message });
     }
 };
