@@ -7,9 +7,8 @@ const baseQuery = fetchBaseQuery({
     baseUrl: process.env.NEXT_PUBLIC_API_URL || 'https://qr-token-verifer-server.vercel.app/api',
     prepareHeaders: async (headers) => {
         const session = await getSession();
-        // @ts-ignore
-        if (session?.accessToken) {
-            // @ts-ignore
+        // Only add authorization header if logged in via our backend (credentials)
+        if (session?.accessToken && session?.provider === 'credentials') {
             headers.set('authorization', `Bearer ${session.accessToken}`);
         }
         return headers;
