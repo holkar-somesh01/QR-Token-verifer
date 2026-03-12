@@ -53,8 +53,21 @@ export default function UsersPage() {
 
     // Email Templates
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-    const [emailSubject, setEmailSubject] = useState('Your Food Access QR Code');
-    const [emailBody, setEmailBody] = useState('<h2>Hello {name},</h2><p>Your meal QR code for Expo is attached below.</p><p>Please keep this QR safe as it is required for all meal check-ins.</p>');
+    
+    // Default professional template
+    const DEFAULT_SUBJECT = "Action Required: Your Digital Access QR for {name}";
+    const DEFAULT_BODY = `<h2>Welcome {name},</h2>
+<p>Your official event registration is complete. Your unique <b>Access QR Code</b> is attached below.</p>
+<p><b>Important Instructions:</b></p>
+<ul>
+  <li>Show this QR at the scanning desk for meal authentication.</li>
+  <li>This code is registered to <b>{expoId}</b>.</li>
+  <li>Keep it safe - digital or printed copy works.</li>
+</ul>
+<p>We look forward to seeing you at the event!</p>`;
+
+    const [emailSubject, setEmailSubject] = useState(DEFAULT_SUBJECT);
+    const [emailBody, setEmailBody] = useState(DEFAULT_BODY);
 
     useEffect(() => {
         setIsMounted(true);
@@ -497,57 +510,84 @@ export default function UsersPage() {
             {/* Email Settings Modal */}
             {isEmailModalOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[3rem] p-10 shadow-2xl border border-white/10">
+                    <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-2xl border border-white/10 overflow-y-auto max-h-[95vh] custom-scrollbar">
                         <div className="flex justify-between items-start mb-8">
                             <div>
-                                <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Email Template</h3>
-                                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Customize the QR distribution message.</p>
+                                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Email Architect</h3>
+                                <p className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Design the digital handshake for your participants.</p>
                             </div>
-                            <button onClick={() => setIsEmailModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 transition-colors"><XCircle size={32} strokeWidth={1} /></button>
+                            <button onClick={() => setIsEmailModalOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><XCircle size={28} className="sm:size-8" strokeWidth={1.5} /></button>
                         </div>
 
-                        <div className="space-y-6">
+                        <div className="space-y-6 sm:space-y-8">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Subject Line</label>
+                                <div className="flex justify-between items-center">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Subject Blueprint</label>
+                                    <button 
+                                        onClick={() => { setEmailSubject(DEFAULT_SUBJECT); setEmailBody(DEFAULT_BODY); }}
+                                        className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:underline"
+                                    >
+                                        Restore Default
+                                    </button>
+                                </div>
                                 <input 
                                     value={emailSubject} 
                                     onChange={e => setEmailSubject(e.target.value)}
-                                    className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" 
+                                    className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none focus:border-blue-500 transition-all" 
                                     placeholder="e.g. Your Expo QR Code"
                                 />
                             </div>
 
-                            <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Body (HTML Supported)</label>
+                            <div className="space-y-3">
+                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Transmission Body (HTML)</label>
                                     <div className="flex gap-2">
-                                        <span className="text-[9px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-black uppercase">{"{name}"}</span>
-                                        <span className="text-[9px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-black uppercase">{"{expoId}"}</span>
+                                        <span className="text-[9px] bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-1 rounded-lg font-black uppercase">{"{name}"}</span>
+                                        <span className="text-[9px] bg-slate-50 dark:bg-slate-800 text-slate-400 px-2 py-1 rounded-lg font-black uppercase">{"{expoId}"}</span>
                                     </div>
                                 </div>
                                 <textarea 
                                     value={emailBody} 
                                     onChange={e => setEmailBody(e.target.value)}
-                                    rows={8}
-                                    className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none resize-none" 
+                                    rows={6}
+                                    className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none resize-none focus:border-blue-500 transition-all font-mono" 
                                     placeholder="Write your email content here..."
                                 />
                             </div>
 
-                            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Live Preview (Personalized)</p>
-                                <div className="text-xs text-slate-600 dark:text-slate-300">
-                                    <p className="font-bold text-slate-900 dark:text-white mb-2">Subject: {emailSubject.replace(/{name}/g, 'Somesh').replace(/{expoId}/g, 'EXPO-001')}</p>
-                                    <div dangerouslySetInnerHTML={{ __html: emailBody.replace(/{name}/g, 'Somesh').replace(/{expoId}/g, 'EXPO-001') }} />
-                                    <div className="mt-4 p-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center text-[9px] text-slate-400 font-bold uppercase">
-                                        [ QR Code Image Attachment ]
+                            <div className="relative p-6 sm:p-8 bg-slate-50 dark:bg-slate-800/20 rounded-[2rem] border border-slate-100 dark:border-white/5 overflow-hidden">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-blue-500/20"></div>
+                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span> Virtual Output Preview
+                                </p>
+                                <div className="space-y-4">
+                                    <div className="pb-4 border-b border-slate-200 dark:border-slate-700">
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Subject</p>
+                                        <p className="text-sm font-black text-slate-900 dark:text-white line-clamp-1">{emailSubject.replace(/{name}/g, 'Somesh Holkar').replace(/{expoId}/g, 'EXPO-A101')}</p>
+                                    </div>
+                                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                                        <div 
+                                            className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 space-y-2 leading-relaxed"
+                                            dangerouslySetInnerHTML={{ __html: emailBody.replace(/{name}/g, 'Somesh Holkar').replace(/{expoId}/g, 'EXPO-A101') }} 
+                                        />
+                                    </div>
+                                    <div className="mt-6 flex flex-col items-center gap-4 py-8 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl bg-white dark:bg-slate-900/50">
+                                        <div className="h-24 w-24 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-slate-300">
+                                            <QrCode size={48} strokeWidth={1} />
+                                        </div>
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Attached QR Identity</p>
                                     </div>
                                 </div>
                             </div>
 
-                            <button onClick={() => setIsEmailModalOpen(false)} className="w-full py-5 rounded-2xl bg-slate-900 dark:bg-white dark:text-slate-900 text-white font-black uppercase tracking-widest text-xs hover:opacity-90 transition-all shadow-xl">
-                                Save Template
-                            </button>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <button onClick={() => setIsEmailModalOpen(false)} className="order-2 sm:order-1 flex-1 py-4 sm:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 transition-all">
+                                    Dismiss
+                                </button>
+                                <button onClick={() => setIsEmailModalOpen(false)} className="order-1 sm:order-2 flex-[2] py-4 sm:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20">
+                                    Save Architecture
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
