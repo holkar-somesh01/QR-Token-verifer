@@ -71,12 +71,12 @@ export default function Home() {
         )}
 
         {/* Status Dashboard */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-          <StatCard label="Registered" value={registered} icon={<Users size={20} />} sub="Participants" color="blue" />
-          <StatCard label="D1 Breakfast" value={totals.day1Breakfast} total={registered} icon={<Coffee size={20} />} color="emerald" />
-          <StatCard label="D1 Lunch" value={totals.day1Lunch} total={registered} icon={<Utensils size={20} />} color="amber" />
-          <StatCard label="D2 Breakfast" value={totals.day2Breakfast} total={registered} icon={<Coffee size={20} />} color="indigo" />
-          <StatCard label="D2 Lunch" value={totals.day2Lunch} total={registered} icon={<Utensils size={20} />} color="rose" />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
+          <StatCard label="Registered" value={registered} icon={<Users className="size-4 sm:size-5" />} sub="Participants" color="blue" />
+          <StatCard label="D1 Breakfast" value={totals.day1Breakfast} total={registered} icon={<Coffee className="size-4 sm:size-5" />} color="emerald" />
+          <StatCard label="D1 Lunch" value={totals.day1Lunch} total={registered} icon={<Utensils className="size-4 sm:size-5" />} color="amber" />
+          <StatCard label="D2 Breakfast" value={totals.day2Breakfast} total={registered} icon={<Coffee className="size-4 sm:size-5" />} color="indigo" />
+          <StatCard label="D2 Lunch" value={totals.day2Lunch} total={registered} icon={<Utensils className="size-4 sm:size-5" />} color="rose" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -147,20 +147,21 @@ export default function Home() {
 
 function StatCard({ label, value, total, icon, color }: any) {
     const colors: any = {
-        blue: "text-blue-600 bg-blue-50 border-blue-100",
-        emerald: "text-emerald-600 bg-emerald-50 border-emerald-100",
-        amber: "text-amber-600 bg-amber-50 border-amber-100",
-        indigo: "text-indigo-600 bg-indigo-50 border-indigo-100",
+        blue: "text-blue-600 bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800",
+        emerald: "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800",
+        amber: "text-amber-600 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800",
+        indigo: "text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800",
+        rose: "text-rose-600 bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800",
     }
     return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-xl transition-all hover:translate-y-[-4px]">
-            <div className={`p-3 rounded-2xl w-fit mb-6 border ${colors[color]}`}>
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 sm:p-8 rounded-[1.5rem] sm:rounded-[2.5rem] shadow-xl transition-all hover:translate-y-[-4px]">
+            <div className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl w-fit mb-4 sm:mb-6 border ${colors[color] || colors.blue}`}>
                 {icon}
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{label}</p>
-            <div className="flex items-baseline gap-2">
-                <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{value || 0}</h3>
-                {total && <span className="text-xs text-slate-400 font-bold">/ {total}</span>}
+            <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1 truncate">{label}</p>
+            <div className="flex items-baseline gap-1 sm:gap-2">
+                <h3 className="text-xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{value || 0}</h3>
+                {total > 0 && <span className="text-[10px] sm:text-xs text-slate-400 font-bold truncate">/ {total}</span>}
             </div>
         </div>
     )

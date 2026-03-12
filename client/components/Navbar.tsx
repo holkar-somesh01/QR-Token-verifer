@@ -1,6 +1,6 @@
 "use client";
 import { signOut, useSession } from "next-auth/react";
-import { LogOut, User, Menu, X, QrCode } from "lucide-react";
+import { LogOut, User, Menu, X, QrCode, Clock } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -41,12 +41,12 @@ export default function Navbar() {
 
                     <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-2"></div>
 
-                    <div className="view-profile flex items-center gap-3 pl-2">
-                        <div className="text-right">
-                            <p className="text-xs font-bold text-slate-900 dark:text-white leading-none">{session?.user?.name || "Administrator"}</p>
-                            <p className="text-[10px] text-slate-500 mt-1 uppercase font-semibold">Active Session</p>
+                    <div className="view-profile hidden lg:flex items-center gap-3 pl-2 max-w-[180px]">
+                        <div className="text-right overflow-hidden">
+                            <p className="text-xs font-bold text-slate-900 dark:text-white leading-none truncate w-full">{session?.user?.name || "Administrator"}</p>
+                            <p className="text-[10px] text-slate-500 mt-1 uppercase font-semibold">Authorized</p>
                         </div>
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-bold border border-slate-200 dark:border-slate-800">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-bold border border-slate-200 dark:border-slate-800 shrink-0">
                             {session?.user?.name?.[0] || "A"}
                         </div>
                     </div>
@@ -70,36 +70,40 @@ export default function Navbar() {
 
             {/* Mobile Menu */}
             {mobileMenuOpen && (
-                <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4 shadow-xl dark:shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300 relative z-50">
-                    <div className="flex items-center gap-4 px-2 py-3 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-slate-900 shadow-sm dark:shadow-inner border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-bold text-lg">
-                            {session?.user?.name?.[0] || "A"}
+                <div className="md:hidden fixed inset-x-0 top-16 bottom-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-300">
+                    <div className="p-4 space-y-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-2xl">
+                        <div className="flex items-center gap-4 px-4 py-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-slate-900 shadow-sm dark:shadow-inner border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-bold text-lg">
+                                {session?.user?.name?.[0] || "A"}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{session?.user?.name || "Admin User"}</p>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Authenticated Agent</p>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-sm font-bold text-slate-900 dark:text-white">{session?.user?.name || "Admin User"}</p>
-                            <p className="text-xs text-slate-500">Authorized Personnel</p>
+                        <div className="flex flex-col space-y-1 px-1">
+                            <Link onClick={() => setMobileMenuOpen(false)} href="/" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
+                                <QrCode size={18} /> Dashboard
+                            </Link>
+                            <Link onClick={() => setMobileMenuOpen(false)} href="/users" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
+                                <User size={18} /> User Records
+                            </Link>
+                            <Link onClick={() => setMobileMenuOpen(false)} href="/attendance" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
+                                <Clock size={18} /> Audit Ledger
+                            </Link>
+                        </div>
+                        <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                            <button
+                                onClick={() => signOut()}
+                                className="flex w-full items-center gap-3 rounded-xl px-4 py-4 text-sm font-black uppercase tracking-[0.2em] text-rose-600 dark:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors"
+                            >
+                                <LogOut size={18} />
+                                Terminate
+                            </button>
                         </div>
                     </div>
-                    <div className="flex flex-col space-y-1 px-1">
-                        <Link onClick={() => setMobileMenuOpen(false)} href="/" className="block rounded-xl px-4 py-3 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
-                            Dashboard Overview
-                        </Link>
-                        <Link onClick={() => setMobileMenuOpen(false)} href="/users" className="block rounded-xl px-4 py-3 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
-                            User Management
-                        </Link>
-                        <Link onClick={() => setMobileMenuOpen(false)} href="/attendance" className="block rounded-xl px-4 py-3 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
-                            Attendance Logs
-                        </Link>
-                    </div>
-                    <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
-                        <button
-                            onClick={() => signOut()}
-                            className="flex w-full items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-rose-600 dark:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors"
-                        >
-                            <LogOut size={18} />
-                            Terminate Session
-                        </button>
-                    </div>
+                    {/* Backdrop to close */}
+                    <div className="flex-1" onClick={() => setMobileMenuOpen(false)}></div>
                 </div>
             )}
         </nav>

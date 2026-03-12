@@ -16,7 +16,7 @@ export default function AttendancePage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [activeFilters, setActiveFilters] = useState<string[]>([]);
-    const [showFilters, setShowFilters] = useState(false);
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'scanTime', direction: 'desc' });
 
     const [deleteScan, { isLoading: isDeleting }] = useDeleteScanMutation();
@@ -82,10 +82,10 @@ export default function AttendancePage() {
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 overflow-x-hidden pb-20 transition-colors duration-300">
             <Navbar />
             <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Scan <span className="text-slate-400">Master Ledger</span></h1>
-                        <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Audit trail for all food distribution events.</p>
+                        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Scan <span className="text-slate-400">Master Ledger</span></h1>
+                        <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Audit trail for all food distribution events.</p>
                     </div>
                     <button onClick={() => {
                          const csv = "Name,ExpoId,MealType,Time,ScannedBy\n" + processedHistory.map((h:any) => `"${h.userName}","${h.expoId}","${h.mealType}","${h.scanTime}","${h.scannedBy}"`).join("\n");
@@ -95,21 +95,25 @@ export default function AttendancePage() {
                          a.href = url;
                          a.download = 'meal_logs.csv';
                          a.click();
-                    }} className="px-6 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2">
-                        <Download size={14} /> Export CSV
+                    }} className="w-full sm:w-auto px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
+                        <Download size={14} /> <span className="sm:inline">Export CSV</span>
                     </button>
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex gap-3 items-center">
                     <div className="relative flex-1">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Filter by Participant name or Expo ID..."
+                            placeholder="Filter by Participant..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-medium outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                         />
+                    </div>
+                    <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 shrink-0">
+                         <button onClick={() => setViewMode('table')} className={`p-2.5 rounded-xl ${viewMode === 'table' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600' : 'text-slate-400'}`}><Filter size={18} /></button>
+                         <button onClick={() => setViewMode('grid')} className={`p-2.5 rounded-xl ${viewMode === 'grid' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600' : 'text-slate-400 text-sm font-black'}`}>Grid</button>
                     </div>
                 </div>
 
@@ -126,51 +130,91 @@ export default function AttendancePage() {
                     ))}
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse min-w-[800px]">
-                            <thead>
-                                <tr className="border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 text-[10px] uppercase font-black tracking-widest text-slate-400">
-                                    <th className="px-8 py-5">Participant</th>
-                                    <th className="px-8 py-5">Meal Type</th>
-                                    <th className="px-8 py-5">Scan Trace</th>
-                                    <th className="px-8 py-5">Operator</th>
-                                    <th className="px-8 py-5 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
-                                {paginatedHistory.map((log: any) => (
-                                    <tr key={log.scanId} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
-                                        <td className="px-8 py-6">
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-900 dark:text-white">{log.userName}</p>
-                                                <p className="text-[10px] font-mono text-slate-400 uppercase">{log.expoId || `#${log.scanId}`}</p>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <div className="flex items-center gap-2">
-                                                {log.mealType.includes('Breakfast') ? <Coffee size={14} className="text-amber-500" /> : <Utensils size={14} className="text-blue-500" />}
-                                                <span className="text-xs font-black uppercase tracking-tighter text-slate-700 dark:text-slate-300">{log.mealType}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <div className="flex flex-col">
-                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{new Date(log.scanTime).toLocaleDateString()}</span>
-                                                <span className="text-[10px] text-slate-400 font-medium">{new Date(log.scanTime).toLocaleTimeString()}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <span className="text-xs font-bold text-slate-500">{log.scannedBy}</span>
-                                        </td>
-                                        <td className="px-8 py-6 text-right">
-                                            <button onClick={() => handleDelete(log.scanId)} className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-colors">
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </td>
+                <div className="bg-white dark:bg-slate-900 rounded-[2rem] sm:rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl overflow-hidden">
+                    {viewMode === 'table' ? (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse min-w-[800px]">
+                                <thead>
+                                    <tr className="border-b border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 text-[10px] uppercase font-black tracking-widest text-slate-400">
+                                        <th className="px-8 py-5">Participant</th>
+                                        <th className="px-8 py-5">Meal Type</th>
+                                        <th className="px-8 py-5">Scan Trace</th>
+                                        <th className="px-8 py-5">Operator</th>
+                                        <th className="px-8 py-5 text-right">Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
+                                    {paginatedHistory.map((log: any) => (
+                                        <tr key={log.scanId} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
+                                            <td className="px-8 py-6">
+                                                <div>
+                                                    <p className="text-sm font-bold text-slate-900 dark:text-white">{log.userName}</p>
+                                                    <p className="text-[10px] font-mono text-slate-400 uppercase">{log.expoId || `#${log.scanId}`}</p>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <div className="flex items-center gap-2">
+                                                    {log.mealType.includes('Breakfast') ? <Coffee size={14} className="text-amber-500" /> : <Utensils size={14} className="text-blue-500" />}
+                                                    <span className="text-xs font-black uppercase tracking-tighter text-slate-700 dark:text-slate-300">{log.mealType}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{new Date(log.scanTime).toLocaleDateString()}</span>
+                                                    <span className="text-[10px] text-slate-400 font-medium">{new Date(log.scanTime).toLocaleTimeString()}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <span className="text-xs font-bold text-slate-500">{log.scannedBy}</span>
+                                            </td>
+                                            <td className="px-8 py-6 text-right">
+                                                <button onClick={() => handleDelete(log.scanId)} className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-colors">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 p-6 sm:p-8 gap-4 sm:gap-6">
+                             {paginatedHistory.map((log: any) => (
+                                <div key={log.scanId} className="p-6 bg-slate-50 dark:bg-slate-800/30 rounded-[2rem] border border-slate-100 dark:border-slate-800 hover:shadow-xl transition-all relative group">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-900 font-bold border border-slate-200 dark:border-slate-800 shadow-sm">{log.userName?.[0]}</div>
+                                            <div>
+                                                <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[140px]">{log.userName}</h3>
+                                                <p className="text-[9px] font-mono text-slate-400 uppercase">{log.expoId || 'no_id'}</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => handleDelete(log.scanId)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={14} /></button>
+                                    </div>
+                                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600">
+                                                {log.mealType.includes('Breakfast') ? <Coffee size={12} /> : <Utensils size={12} />}
+                                            </div>
+                                            <span className="text-[10px] font-black uppercase tracking-tighter text-slate-700 dark:text-slate-300">{log.mealType}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-bold text-slate-500 uppercase">{new Date(log.scanTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                            <p className="text-[8px] text-slate-400">{new Date(log.scanTime).toLocaleDateString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                             ))}
+                        </div>
+                    )}
+
+                    {/* Pagination */}
+                    <div className="p-6 sm:p-8 border-t border-slate-50 dark:border-slate-800 flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50/10">
+                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Page {currentPage} of {totalPages}</p>
+                         <div className="flex gap-2">
+                             <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} className="p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 disabled:opacity-30" disabled={currentPage === 1}><ChevronLeft size={16} /></button>
+                             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} className="p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 disabled:opacity-30" disabled={currentPage === totalPages}><ChevronRight size={16} /></button>
+                         </div>
                     </div>
                 </div>
             </main>

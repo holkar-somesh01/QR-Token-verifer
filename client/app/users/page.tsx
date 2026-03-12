@@ -213,19 +213,19 @@ export default function UsersPage() {
                     </div>
                 </div>
 
-                <div className="flex flex-col xl:flex-row gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl">
-                    <div className="grid grid-cols-2 md:flex gap-3 w-full xl:w-auto">
-                        <button onClick={() => { setEditingUser(null); setFormData({ name: '', expoId: '', participantType: 'normal', status: 'active', mealStatus: { day1Breakfast: 'not_used', day1Lunch: 'not_used', day2Breakfast: 'not_used', day2Lunch: 'not_used' } }); setIsUserModalOpen(true); }} className="px-5 py-3 rounded-2xl bg-slate-900 dark:bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-2">
-                             <Plus size={14} /> Add Participant
+                <div className="flex flex-col xl:flex-row gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-[2rem] sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl">
+                    <div className="grid grid-cols-2 lg:flex gap-2 sm:gap-3 w-full xl:w-auto">
+                        <button onClick={() => { setEditingUser(null); setFormData({ name: '', expoId: '', participantType: 'normal', status: 'active', mealStatus: { day1Breakfast: 'not_used', day1Lunch: 'not_used', day2Breakfast: 'not_used', day2Lunch: 'not_used' } }); setIsUserModalOpen(true); }} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-slate-900 dark:bg-slate-800 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-1.5 sm:gap-2">
+                             <Plus size={12} className="sm:size-[14px]" /> <span className="truncate">Add User</span>
                         </button>
-                        <button onClick={() => setIsImportModalOpen(true)} className="px-5 py-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2">
-                             <FileSpreadsheet size={14} className="text-emerald-500" /> Bulk Import
+                        <button onClick={() => setIsImportModalOpen(true)} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-slate-700 dark:text-slate-300">
+                             <FileSpreadsheet size={12} className="text-emerald-500 sm:size-[14px]" /> <span className="truncate">Import</span>
                         </button>
-                        <button onClick={() => handleGenerateQR(selectedUsers.length > 0 ? selectedUsers : 'all')} className="px-5 py-3 rounded-2xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-500/20">
-                             <QrCode size={14} /> Issue QR
+                        <button onClick={() => handleGenerateQR(selectedUsers.length > 0 ? selectedUsers : 'all')} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-blue-600 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg shadow-blue-500/20">
+                             <QrCode size={12} className="sm:size-[14px]" /> <span className="truncate">Issue QR</span>
                         </button>
-                        <button onClick={handleSendBulk} className="px-5 py-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2">
-                             <Mail size={14} className="text-blue-500" /> Send Invites
+                        <button onClick={handleSendBulk} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-slate-700 dark:text-slate-300">
+                             <Mail size={12} className="text-blue-500 sm:size-[14px]" /> <span className="truncate">Invites</span>
                         </button>
                     </div>
                     <div className="relative flex-1 w-full">
@@ -352,24 +352,24 @@ export default function UsersPage() {
                             <button onClick={() => setIsUserModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 transition-colors"><XCircle size={32} strokeWidth={1} /></button>
                         </div>
 
-                        <form onSubmit={handleSaveUser} className="space-y-8">
-                            <div className="grid grid-cols-2 gap-6">
+                        <form onSubmit={handleSaveUser} className="space-y-6 sm:space-y-8">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">FullName</label>
-                                    <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" placeholder="e.g. Somesh Holkar" />
+                                    <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" placeholder="e.g. Somesh Holkar" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Expo Identifier</label>
-                                    <input required value={formData.expoId} onChange={e => setFormData({...formData, expoId: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" placeholder="EXPO-2026-X" />
+                                    <input required value={formData.expoId} onChange={e => setFormData({...formData, expoId: e.target.value})} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" placeholder="EXPO-2026-X" />
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Allocation Type</label>
-                                    <div className="flex gap-4">
+                                    <div className="flex gap-3 sm:gap-4">
                                         {['normal', 'poster'].map(type => (
-                                            <button key={type} type="button" onClick={() => setFormData({...formData, participantType: type})} className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${formData.participantType === type ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-slate-100 dark:border-slate-800'}`}>
+                                            <button key={type} type="button" onClick={() => setFormData({...formData, participantType: type})} className={`flex-1 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${formData.participantType === type ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-slate-100 dark:border-slate-800'}`}>
                                                 {type}
                                             </button>
                                         ))}
@@ -377,13 +377,13 @@ export default function UsersPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Security Status</label>
-                                    <div className="flex gap-4">
+                                    <div className="flex gap-3 sm:gap-4">
                                         {[
                                             { id: 'active', label: 'Active', icon: CheckCircle, color: 'emerald' },
                                             { id: 'locked', label: 'Locked', icon: XCircle, color: 'rose' }
                                         ].map(st => (
-                                            <button key={st.id} type="button" onClick={() => setFormData({...formData, status: st.id})} className={`flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${formData.status === st.id ? (st.id === 'active' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-rose-600 text-white border-rose-600') : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-slate-100 dark:border-slate-800'}`}>
-                                                <st.icon size={14} />
+                                            <button key={st.id} type="button" onClick={() => setFormData({...formData, status: st.id})} className={`flex-1 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${formData.status === st.id ? (st.id === 'active' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-rose-600 text-white border-rose-600') : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-slate-100 dark:border-slate-800'}`}>
+                                                <st.icon size={12} className="sm:size-[14px]" />
                                                 {st.label}
                                             </button>
                                         ))}
@@ -393,7 +393,7 @@ export default function UsersPage() {
 
                             <div className="space-y-4">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Privilege Status Overrides</label>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                      <MealStatusControl label="Day 1 Breakfast" status={formData.mealStatus.day1Breakfast} onToggle={(s) => handleUpdateMeal('day1Breakfast', s)} />
                                      <MealStatusControl label="Day 1 Lunch" status={formData.mealStatus.day1Lunch} onToggle={(s) => handleUpdateMeal('day1Lunch', s)} />
                                      {formData.participantType !== 'poster' && (

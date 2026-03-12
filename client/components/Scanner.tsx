@@ -139,8 +139,8 @@ export default function Scanner() {
 
             {/* Scanning Overlay (Central Focus) */}
             {!scannedId && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none">
-                    <div className="relative w-72 h-72">
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none p-4">
+                    <div className="relative w-full max-w-[280px] aspect-square sm:w-72 sm:h-72">
                          {/* Corner Borders */}
                          <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl-2xl"></div>
                          <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr-2xl"></div>
@@ -153,68 +153,68 @@ export default function Scanner() {
                              </div>
                          </div>
                     </div>
-                    <p className="mt-8 text-white/60 font-black uppercase tracking-[0.3em] text-[10px] animate-pulse">Scanning for Participant Code</p>
+                    <p className="mt-8 text-white/60 font-black uppercase tracking-[0.3em] text-[10px] animate-pulse text-center">Scanning for Participant Code</p>
                 </div>
             )}
 
             {/* Floating Results Card */}
             {scannedId && details && (
                 <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-6 animate-in fade-in slide-in-from-bottom-10 duration-500">
-                    <div className="w-full max-w-xl bg-white dark:bg-slate-900 sm:rounded-[3rem] p-8 sm:p-10 shadow-2xl border-t sm:border border-white/10 max-h-[90vh] overflow-y-auto custom-scrollbar">
-                        <div className="flex items-center gap-6 mb-8">
-                            <div className="h-20 w-20 rounded-3xl bg-blue-600 flex items-center justify-center text-white text-3xl font-black shadow-2xl shadow-blue-500/40">
+                    <div className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-t-[2.5rem] sm:rounded-[3rem] p-6 sm:p-10 shadow-2xl border-t sm:border border-white/10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+                        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 mb-8 text-center sm:text-left">
+                            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl sm:rounded-3xl bg-blue-600 flex items-center justify-center text-white text-2xl sm:text-3xl font-black shadow-2xl shadow-blue-500/40 shrink-0">
                                 {details.user.name?.[0] || 'U'}
                             </div>
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">{details.user.name}</h3>
-                                    <div className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase border ${details.user.participantType === 'poster' ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex flex-col sm:flex-row items-center gap-2 mb-1">
+                                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none truncate w-full sm:w-auto">{details.user.name}</h3>
+                                    <div className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase border shrink-0 ${details.user.participantType === 'poster' ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
                                         {details.user.participantType}
                                     </div>
                                 </div>
-                                <p className="text-xs text-slate-400 font-mono tracking-widest">{details.user.expoId || `#${details.user.id}`}</p>
+                                <p className="text-[10px] sm:text-xs text-slate-400 font-mono tracking-widest">{details.user.expoId || `#${details.user.id}`}</p>
                             </div>
                         </div>
 
                         {details.user.status === 'locked' && (
-                            <div className="mb-6 bg-rose-500/10 border border-rose-500/20 p-5 rounded-3xl flex items-center gap-4 text-rose-500 animate-pulse">
-                                <XCircle size={28} />
+                            <div className="mb-6 bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl flex items-center gap-4 text-rose-500 animate-pulse">
+                                <XCircle size={24} className="shrink-0" />
                                 <div className="flex-1">
-                                    <p className="text-xs font-black uppercase tracking-widest">Access Revoked</p>
-                                    <p className="text-[10px] font-bold opacity-80">This participant token has been locked by administration.</p>
+                                    <p className="text-[10px] sm:text-xs font-black uppercase tracking-widest">Access Revoked</p>
+                                    <p className="text-[9px] sm:text-[10px] font-bold opacity-80">Locked by administration.</p>
                                 </div>
                             </div>
                         )}
 
                         {details.warning && (
-                            <div className="mb-6 bg-amber-500/10 border border-amber-500/20 p-5 rounded-3xl flex items-center gap-4 text-amber-500">
-                                <AlertTriangle size={28} />
+                            <div className="mb-6 bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl flex items-center gap-4 text-amber-500">
+                                <AlertTriangle size={24} className="shrink-0" />
                                 <div className="flex-1">
-                                    <p className="text-xs font-black uppercase tracking-widest">Sequence Advisory</p>
-                                    <p className="text-[10px] font-bold opacity-80">{details.warning}</p>
+                                    <p className="text-[10px] sm:text-xs font-black uppercase tracking-widest">Sequence Advisory</p>
+                                    <p className="text-[9px] sm:text-[10px] font-bold opacity-80">{details.warning}</p>
                                 </div>
                             </div>
                         )}
 
-                        <div className="grid grid-cols-2 gap-4 mb-8">
-                             <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-[2rem] border border-slate-100 dark:border-white/5">
-                                <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-3">Expected Meal</p>
-                                <p className={`text-xl font-black uppercase tracking-tighter ${details.nextMeal === "All Meals Finished" ? "text-rose-500" : "text-blue-600"}`}>
-                                    {details.nextMeal === "Day1 Breakfast" ? "D1 Breakfast" : 
+                        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8">
+                             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100 dark:border-white/5">
+                                <p className="text-[8px] sm:text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-2 sm:mb-3">Expected</p>
+                                <p className={`text-sm sm:text-xl font-black uppercase tracking-tighter ${details.nextMeal === "All Meals Finished" ? "text-rose-500" : "text-blue-600"}`}>
+                                    {details.nextMeal === "Day1 Breakfast" ? "D1 B-fast" : 
                                      details.nextMeal === "Day1 Lunch" ? "D1 Lunch" :
-                                     details.nextMeal === "Day2 Breakfast" ? "D2 Breakfast" :
+                                     details.nextMeal === "Day2 Breakfast" ? "D2 B-fast" :
                                      details.nextMeal === "Day2 Lunch" ? "D2 Lunch" : details.nextMeal}
                                 </p>
                              </div>
-                             <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-[2rem] border border-slate-100 dark:border-white/5">
-                                <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-3">Audit Trace</p>
-                                <p className="text-xl font-black uppercase tracking-tighter text-slate-900 dark:text-white">
-                                    {details.scanCount} <span className="text-slate-300 dark:text-slate-700">/</span> {details.user.participantType === 'poster' ? 2 : 4}
+                             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100 dark:border-white/5">
+                                <p className="text-[8px] sm:text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-2 sm:mb-3">Audit</p>
+                                <p className="text-sm sm:text-xl font-black uppercase tracking-tighter text-slate-900 dark:text-white">
+                                    {details.scanCount}<span className="text-slate-300 dark:text-slate-700 mx-1">/</span>{details.user.participantType === 'poster' ? 2 : 4}
                                 </p>
                              </div>
                         </div>
 
-                        <div className="space-y-2 mb-10 h-32 overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="space-y-1.5 sm:space-y-2 mb-8 h-28 sm:h-32 overflow-y-auto pr-2 custom-scrollbar">
                             <MealStatusRow label="Day 1 Breakfast" status={details.mealStatus.day1Breakfast} />
                             <MealStatusRow label="Day 1 Lunch" status={details.mealStatus.day1Lunch} />
                             {details.user.participantType !== 'poster' && (
@@ -225,14 +225,14 @@ export default function Scanner() {
                             )}
                         </div>
 
-                        <div className="flex gap-4">
-                            <button onClick={resetScanner} className="flex-1 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 transition-all">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <button onClick={resetScanner} className="order-2 sm:order-1 flex-1 py-4 sm:py-5 rounded-2xl sm:rounded-[1.5rem] font-black uppercase tracking-widest text-[9px] sm:text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 transition-all">
                                 Dismiss
                             </button>
                             <button
                                 disabled={details.nextMeal === "All Meals Finished" || details.user.status === 'locked' || approveLoading}
                                 onClick={handleApprove}
-                                className="flex-[2] py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-2"
+                                className="order-1 sm:order-2 flex-[2] py-4 sm:py-5 rounded-2xl sm:rounded-[1.5rem] font-black uppercase tracking-widest text-[9px] sm:text-[10px] bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-2"
                             >
                                 {approveLoading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
                                 {details.user.status === 'locked' ? 'Unauthorized' : 'Approve Meal'}
@@ -243,7 +243,7 @@ export default function Scanner() {
             )}
 
             {/* Bottom Immersive Controls (Mobile Optimized Glassmorphism) */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 w-max max-w-full px-6 py-4 bg-slate-900/60 backdrop-blur-xl rounded-[2.5rem] border border-white/10 shadow-2xl">
+            <div className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 sm:gap-3 w-max max-w-[90%] sm:max-w-full px-4 sm:px-6 py-3 sm:py-4 bg-slate-900/60 backdrop-blur-xl rounded-3xl sm:rounded-[2.5rem] border border-white/10 shadow-2xl">
                 <input
                     id="file-scan"
                     type="file"
