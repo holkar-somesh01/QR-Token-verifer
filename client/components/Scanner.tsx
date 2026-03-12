@@ -100,11 +100,13 @@ export default function Scanner() {
                 token: scannedId, 
                 scannedBy: session?.user?.name || 'admin' 
             }).unwrap();
-            alert("Meal Approved successfully!");
+            // Optional: You could add a temporary success state here
             resetScanner();
             refetchStats();
         } catch (err: any) {
-            alert(err.data?.message || "Approval failed");
+            console.error("Approval failed:", err.data?.message);
+            // Re-start scanner even on failure so it doesn't get stuck
+            setTimeout(() => resetScanner(), 2000);
         }
     };
 

@@ -12,7 +12,7 @@ export default function Home() {
   const [showScanner, setShowScanner] = useState(false);
 
   const { data: apiData, isLoading: statsLoading, refetch } = useGetStatsQuery(undefined, {
-    pollingInterval: 5000,
+    pollingInterval: 2000,
     skip: !session
   });
 
