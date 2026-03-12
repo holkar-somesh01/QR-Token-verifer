@@ -4,38 +4,46 @@ const { sql } = require('drizzle-orm');
 // Users Table
 const users = pgTable('users', {
     id: serial('id').primaryKey(),
-    studentId: text('student_id').notNull().unique(), // Unique identifier from sheet
-    fullName: text('full_name').notNull(),
-    email: text('email'),
+    name: text('name').notNull(),
     mobile: text('mobile'),
-    class: text('class'),
-    customFields: jsonb('custom_fields'), // JSON string for extra columns
+    email: text('email'),
+    expoId: text('expo_id'),
+    qrCode: text('qr_code').unique(), // Stores user_id or unique token
+    participantType: text('participant_type').default('normal'), // 'normal' or 'poster'
+    totalScans: integer('total_scans').default(0),
+    status: text('status').default('active'), // 'active' or 'locked'
     createdAt: timestamp('created_at').defaultNow(),
 });
 
-// QR Codes Table
-const qrCodes = pgTable('qr_codes', {
+// Meal_Status Table
+const mealStatus = pgTable('meal_status', {
     id: serial('id').primaryKey(),
-    userId: integer('user_id').references(() => users.id).notNull(),
-    token: text('token').notNull().unique(),
-    status: text('status').default('unused'), // 'unused', 'used', 'expired'
-    createdAt: timestamp('created_at').defaultNow(),
-    expiresAt: timestamp('expires_at'),
-    usedAt: timestamp('used_at'),
+    userId: integer('user_id').references(() => users.id).notNull().unique(),
+    day1Breakfast: text('day1_breakfast').default('not_used'), // 'not_used', 'used'
+    day1Lunch: text('day1_lunch').default('not_used'),
+    day2Breakfast: text('day2_breakfast').default('not_used'),
+    day2Lunch: text('day2_lunch').default('not_used'),
 });
 
-// QR Scans Table (Logs)
-const qrScans = pgTable('qr_scans', {
+// Scan_Logs Table
+const scanLogs = pgTable('scan_logs', {
     id: serial('id').primaryKey(),
-    qrId: integer('qr_id').references(() => qrCodes.id).notNull(),
     userId: integer('user_id').references(() => users.id).notNull(),
-    scannedBy: text('scanned_by'), // Admin/Scanner ID
-    scannedAt: timestamp('scanned_at').defaultNow(),
-    ipAddress: text('ip_address'),
-    deviceInfo: text('device_info'),
+    scanNumber: integer('scan_number').notNull(),
+    mealType: text('meal_type').notNull(), // 'Day1 Breakfast', etc.
+    scanTime: timestamp('scan_time').defaultNow(),
+    scannedBy: text('scanned_by'), // Volunteer ID or name
 });
 
-// Admin Users Table
+// Volunteers Table
+const volunteers = pgTable('volunteers', {
+    id: serial('id').primaryKey(),
+    name: text('name').notNull(),
+    mobile: text('mobile'),
+    role: text('role').default('volunteer'),
+});
+
+// Admin Users Table (for dashboard login)
 const admins = pgTable('admins', {
     id: serial('id').primaryKey(),
     username: text('username').notNull().unique(),
@@ -46,7 +54,8 @@ const admins = pgTable('admins', {
 
 module.exports = {
     users,
-    qrCodes,
-    qrScans,
+    mealStatus,
+    scanLogs,
+    volunteers,
     admins,
 };

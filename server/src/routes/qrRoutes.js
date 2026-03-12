@@ -6,6 +6,7 @@ const { verifyToken } = require('../controllers/authController');
 
 // Import Users from Excel/CSV (Protected)
 router.post('/import', verifyToken, upload.single('file'), qrController.importUsersFromFile);
+router.post('/import-gsheet', verifyToken, qrController.importFromGoogleSheet);
 
 // Generate QR Codes (Protected)
 router.post('/generate', verifyToken, qrController.generateQRCodes);

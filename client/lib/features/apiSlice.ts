@@ -47,7 +47,7 @@ export const apiSlice = createApi({
             }),
             invalidatesTags: ['Stats'],
         }),
-        scanQR: builder.mutation<any, { hash?: string, token?: string, deviceId?: string }>({
+        scanQR: builder.mutation<any, { hash?: string, token?: string, deviceId?: string, scannedBy?: string }>({
             query: (body) => ({
                 url: '/qr/scan',
                 method: 'POST',
@@ -77,6 +77,14 @@ export const apiSlice = createApi({
         importUsers: builder.mutation<any, FormData>({
             query: (body) => ({
                 url: '/qr/import',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: ['Users', 'Stats'],
+        }),
+        importGoogleSheet: builder.mutation<any, { url: string }>({
+            query: (body) => ({
+                url: '/qr/import-gsheet',
                 method: 'POST',
                 body,
             }),
@@ -157,6 +165,7 @@ export const {
     useDeleteScanMutation,
     useAddUserMutation,
     useUpdateUserMutation,
-    useDeleteUserMutation
+    useDeleteUserMutation,
+    useImportGoogleSheetMutation
 } = apiSlice
 

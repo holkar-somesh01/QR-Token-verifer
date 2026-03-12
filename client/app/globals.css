@@ -1,40 +1,23 @@
 @import "tailwindcss";
 
-:root {
-  /* Official Professional Palette */
-  --primary: #0f172a;
-  /* Slate 900 */
-  --primary-accent: #2563eb;
-  /* Blue 600 */
-  --secondary: #64748b;
-  /* Slate 500 */
-  --background: #f8fafc;
-  /* Slate 50 */
-  --card: #ffffff;
-  --border: #e2e8f0;
-  /* Slate 200 */
-  --text-main: #1e293b;
-  /* Slate 800 */
-  --text-muted: #64748b;
-  /* Slate 500 */
-  --success: #10b981;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-}
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-sans: "Inter", "Geist", system-ui, sans-serif;
+
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  /* Add other colors if needed, but Tailwind has defaults */
 }
 
-body {
-  background-color: var(--background);
-  color: var(--text-main);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
+:root {
+  /* ... Custom Vars if needed ... */
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
-/* Custom Scrollbar for Official Look */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -48,38 +31,27 @@ body {
   border-radius: 10px;
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
 
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
 .official-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 1rem;
-  box-shadow: var(--shadow-sm);
-  transition: all 0.2s ease-in-out;
+  @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm transition-all duration-200;
 }
 
 .official-card:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--primary-accent);
+  @apply shadow-md border-blue-200 dark:border-blue-900/50;
 }
 
-.btn-primary {
-  background: var(--primary);
-  color: white;
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.75rem;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.btn-primary:hover {
-  background: #1e293b;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
-}
-
+/* Animations */
 @keyframes scan {
   0% {
     top: 0%;
@@ -98,21 +70,4 @@ body {
 
 .animate-scan {
   animation: scan 2s ease-in-out infinite;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
 }
