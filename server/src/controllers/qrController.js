@@ -1,6 +1,6 @@
 const { db } = require('../../db');
-const { users, qrCodes, qrScans } = require('../../db/schema');
-const { eq, and, isNull, desc, inArray, sql } = require('drizzle-orm');
+const { users, mealStatus, scanLogs, volunteers } = require('../../db/schema');
+const { eq, and, isNull, desc, inArray, sql, count } = require('drizzle-orm');
 const crypto = require('crypto');
 const XLSX = require('xlsx');
 const fs = require('fs');
@@ -10,6 +10,90 @@ const QRCode = require('qrcode');
 const archiver = require('archiver');
 const { Readable } = require('stream');
 const nodemailer = require('nodemailer');
+const axios = require('axios');
+
+// Constants for Event Dates
+const DAY1_DATE = "2026-03-27";
+const DAY2_DATE = "2026-03-28";
+
+// Helper to process a list of user rows (from Excel or JSON)
+const processImportData = async (data) => {
+    const insertedUsers = [];
+    const errors = [];
+
+    for (const row of data) {
+        // Normalize keys for fuzzy matching
+        const normalizedRow = {};
+        Object.keys(row).forEach(key => {
+            const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+            normalizedRow[normalizedKey] = String(row[key]).trim();
+        });
+
+        // Helper to get value from multiple possible keys
+        const getValue = (possibleKeys) => {
+            for (const key of possibleKeys) {
+                if (normalizedRow[key]) return normalizedRow[key];
+            }
+            return '';
+        };
+
+        const expoId = getValue(['expoid', 'id', 'studentid', 'enrollmentno', 'prn']);
+        let name = getValue(['name', 'fullname', 'studentname', 'candidatename']);
+        if (!name) {
+            const first = getValue(['firstname', 'fname']);
+            const last = getValue(['surname', 'lastname', 'lname']);
+            if (first || last) {
+                name = [first, last].filter(Boolean).join(' ');
+            }
+        }
+
+        const email = getValue(['email', 'gmail', 'mail', 'emailaddress']);
+        const mobile = getValue(['mobile', 'phone', 'contact', 'whatsapp', 'mobileno']);
+        const type = String(getValue(['type', 'participanttype', 'category'])).toLowerCase();
+        const participantType = type.includes('poster') ? 'poster' : 'normal';
+
+        if (!name) {
+            const hasData = Object.values(row).some(val => String(val).trim() !== '');
+            if (hasData) {
+                errors.push({ row, error: 'Could not identify Name.' });
+            }
+            continue;
+        }
+
+        try {
+            let existing = [];
+            if (expoId) {
+                existing = await db.select().from(users).where(eq(users.expoId, expoId)).limit(1);
+            } else if (email) {
+                existing = await db.select().from(users).where(eq(users.email, email)).limit(1);
+            }
+
+            const userData = {
+                name: name,
+                email: email || null,
+                mobile: mobile || null,
+                expoId: expoId || null,
+                participantType: participantType,
+            };
+
+            let userId;
+            if (existing.length > 0) {
+                userId = existing[0].id;
+                await db.update(users).set(userData).where(eq(users.id, userId));
+                insertedUsers.push({ name, status: 'updated' });
+            } else {
+                const inserted = await db.insert(users).values(userData).returning({ id: users.id });
+                userId = inserted[0].id;
+                await db.insert(mealStatus).values({ userId });
+                await db.update(users).set({ qrCode: String(userId) }).where(eq(users.id, userId));
+                insertedUsers.push({ name, status: 'created' });
+            }
+        } catch (err) {
+            errors.push({ name: name || 'Unknown', error: err.message });
+        }
+    }
+    return { insertedUsers, errors };
+};
 
 // Helper to get transporter
 const getTransporter = () => {
@@ -33,204 +117,131 @@ const generateToken = () => {
 // Import Users from Excel/CSV
 exports.importUsersFromFile = async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
         const workbook = XLSX.readFile(req.file.path);
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(sheet);
-
-        const insertedUsers = [];
-        const errors = [];
-
-        for (const row of data) {
-            // Normalize keys for fuzzy matching
-            const normalizedRow = {};
-            Object.keys(row).forEach(key => {
-                const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-                normalizedRow[normalizedKey] = String(row[key]).trim(); // Store trimmed value
-            });
-
-            // Helper to get value from multiple possible keys
-            const getValue = (possibleKeys) => {
-                for (const key of possibleKeys) {
-                    if (normalizedRow[key]) return normalizedRow[key];
-                }
-                return '';
-            };
-
-            // Enhanced Mapping Logic
-            const studentId = getValue(['id', 'studentid', 'enrollmentno', 'prn', 'email', 'gmail', 'emailgmailcom']); // Fallback to email if no ID
-
-            let fullName = getValue(['name', 'fullname', 'studentname', 'candidatename']);
-            if (!fullName) {
-                const first = getValue(['firstname', 'fname']);
-                const mid = getValue(['middlename', 'mname', 'middlename']);
-                const last = getValue(['surname', 'lastname', 'lname', 'surnamename']);
-                if (first || last) {
-                    fullName = [first, mid, last].filter(Boolean).join(' ');
-                }
-            }
-
-            const email = getValue(['email', 'gmail', 'mail', 'emailaddress', 'emailgmailcom']);
-            const mobile = getValue(['mobile', 'phone', 'contact', 'whatsapp', 'mobileno']);
-            const className = getValue(['class', 'department', 'branch', 'course', 'college', 'collegename', 'collegenameandcity', 'year']);
-
-            if (!studentId || !fullName) {
-                // Ignore empty rows
-                const hasData = Object.values(row).some(val => String(val).trim() !== '');
-                if (hasData) {
-                    errors.push({ row, error: 'Could not identify ID or Name. Please check column headers.' });
-                }
-                continue;
-            }
-
-            try {
-                // Check if user exists
-                const existing = await db.select().from(users).where(eq(users.studentId, studentId)).limit(1);
-
-                const userData = {
-                    studentId: studentId,
-                    fullName: fullName,
-                    email: email || null,
-                    mobile: mobile || null,
-                    class: className || null,
-                    customFields: row, // Store original row data for dynamic access
-                };
-
-                if (existing.length > 0) {
-                    await db.update(users).set(userData).where(eq(users.studentId, studentId));
-                    insertedUsers.push({ id: studentId, status: 'updated' });
-                } else {
-                    await db.insert(users).values(userData);
-                    insertedUsers.push({ id: studentId, status: 'created' });
-                }
-            } catch (err) {
-                console.error(err);
-                errors.push({ studentId, error: err.message });
-            }
-        }
-
-        // Cleanup file
+        const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+        
+        const { insertedUsers, errors } = await processImportData(data);
         fs.unlinkSync(req.file.path);
 
-        res.json({
-            message: 'Import completed',
-            total: data.length,
-            successCount: insertedUsers.length,
-            errorCount: errors.length,
-            errors
-        });
-
+        res.json({ message: 'Import completed', total: data.length, successCount: insertedUsers.length, errorCount: errors.length, errors });
     } catch (error) {
         if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        console.error(error);
         res.status(500).json({ error: error.message });
     }
 };
 
-// Generate QR Codes for Users
+exports.importFromGoogleSheet = async (req, res) => {
+    try {
+        let { url } = req.body;
+        if (!url) return res.status(400).json({ error: 'URL required' });
+
+        // Convert common Google Sheets URLs to CSV export format
+        if (url.includes('docs.google.com/spreadsheets')) {
+            const idMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+            if (idMatch) {
+                url = `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv`;
+            }
+        }
+
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        const workbook = XLSX.read(response.data, { type: 'buffer' });
+        const data = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+
+        const { insertedUsers, errors } = await processImportData(data);
+        res.json({ message: 'Google Sheet import completed', total: data.length, successCount: insertedUsers.length, errorCount: errors.length, errors });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch or process Google Sheet: ' + error.message });
+    }
+};
+
+// Generate QR Codes (Actually just updates missing qrCodes if any)
 exports.generateQRCodes = async (req, res) => {
     try {
-        const { userIds, regenerate } = req.body;
-
-        // Validation
-        if (!userIds && userIds !== 'all') {
-            return res.status(400).json({ error: "userIds array or 'all' required" });
-        }
-
-        let targetUsers;
-        if (userIds === 'all') {
-            targetUsers = await db.select().from(users);
-        } else {
-            // userIds should be an array of user.id (integer)
-            // But if frontend sends student_ids (string), we need to query differently.
-            // Let's assume user.id (internal DB id) for now, or handle both.
-            // If the input array has strings, assume studentId. If numbers, assume internal id.
-
-            const isStringIds = userIds.some(id => typeof id === 'string');
-            if (isStringIds) {
-                targetUsers = await db.select().from(users).where(inArray(users.studentId, userIds));
-            } else {
-                targetUsers = await db.select().from(users).where(inArray(users.id, userIds));
-            }
-        }
-
+        const allUsers = await db.select().from(users);
         const results = [];
-
-        for (const user of targetUsers) {
-            // Check existing QR
-            const existingQr = await db.select().from(qrCodes).where(eq(qrCodes.userId, user.id)).limit(1);
-
-            let token;
-            let status = 'generated';
-
-            if (existingQr.length > 0) {
-                if (!regenerate) {
-                    results.push({ id: user.id, status: 'skipped', token: existingQr[0].token });
-                    continue;
-                }
-                // Regenerate: Update existing logic
-                token = generateToken();
-                await db.update(qrCodes).set({
-                    token: token,
-                    status: 'unused',
-                    createdAt: new Date(), // Reset created at? Yes.
-                    expiresAt: null
-                }).where(eq(qrCodes.id, existingQr[0].id));
-                status = 'regenerated';
-            } else {
-                token = generateToken();
-                await db.insert(qrCodes).values({
-                    userId: user.id,
-                    token: token,
-                    status: 'unused',
-                    createdAt: new Date(),
-                    expiresAt: null,
-                });
+        for (const user of allUsers) {
+            if (!user.qrCode) {
+                await db.update(users).set({ qrCode: String(user.id) }).where(eq(users.id, user.id));
+                results.push({ id: user.id, status: 'generated' });
             }
-
-            results.push({ id: user.id, status, token });
         }
-
-        res.json({ message: 'QR Generation completed', count: results.length, results });
-
+        res.json({ message: 'QR Generation completed', count: results.length });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: error.message });
     }
 };
 
-// Get QR Details (Read-only)
+// Get QR Details / Determine Next Meal
 exports.getQRDetails = async (req, res) => {
     try {
-        const { token } = req.params;
+        const token = req.params.token || req.body.token || req.query.token;
+        const userId = parseInt(token);
 
-        if (!token) {
-            return res.status(400).json({ error: 'Token is required' });
+        if (!token || isNaN(userId)) {
+            return res.status(400).json({ error: 'Invalid or missing User ID/Token' });
         }
 
-        const qrRecord = await db.select().from(qrCodes).where(eq(qrCodes.token, token)).limit(1);
-
-        if (!qrRecord.length) {
-            return res.status(404).json({ valid: false, message: 'Invalid QR Code' });
+        const userRecord = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+        if (!userRecord.length) {
+            return res.status(404).json({ valid: false, message: 'User not found' });
         }
 
-        const qr = qrRecord[0];
-        const user = await db.select().from(users).where(eq(users.id, qr.userId)).limit(1);
+        const user = userRecord[0];
+        const status = await db.select().from(mealStatus).where(eq(mealStatus.userId, user.id)).limit(1).then(rows => rows[0]);
+        
+        // Determine Next Meal
+        let nextMeal = null;
+        let warning = null;
+        const scanCount = user.totalScans || 0;
+        const userStatus = user.status || 'active';
+
+        // Date Check
+        const today = new Date().toISOString().split('T')[0];
+        // For testing/mocking, we might want to override today's date if provided in query
+        const mockDate = req.query.date;
+        const currentDate = mockDate || today;
+
+        if (user.participantType === 'poster') {
+            if (scanCount === 0) {
+                nextMeal = "Day1 Breakfast";
+                if (currentDate === DAY2_DATE) warning = "Day1 Breakfast Pending";
+            } else if (scanCount === 1) {
+                nextMeal = "Day1 Lunch";
+                if (currentDate === DAY2_DATE) warning = "Day1 Lunch Pending";
+            } else {
+                nextMeal = "All Meals Finished";
+            }
+        } else {
+            // Normal
+            if (scanCount === 0) {
+                nextMeal = "Day1 Breakfast";
+                if (currentDate === DAY2_DATE) warning = "Day1 Breakfast Pending";
+            } else if (scanCount === 1) {
+                nextMeal = "Day1 Lunch";
+                if (currentDate === DAY2_DATE) warning = "Day1 Lunch Pending";
+            } else if (scanCount === 2) {
+                nextMeal = "Day2 Breakfast";
+                if (currentDate === DAY1_DATE) warning = "Early Scan: Day2 Breakfast";
+            } else if (scanCount === 3) {
+                nextMeal = "Day2 Lunch";
+                if (currentDate === DAY1_DATE) warning = "Early Scan: Day2 Lunch";
+            } else {
+                nextMeal = "All Meals Finished";
+            }
+        }
 
         res.json({
             valid: true,
-            status: qr.status,
-            user: user[0],
-            qr: {
-                token: qr.token,
-                createdAt: qr.createdAt,
-                expiresAt: qr.expiresAt,
-                usedAt: qr.usedAt
-            }
+            user,
+            mealStatus: status,
+            nextMeal,
+            warning,
+            scanCount,
+            currentDate
         });
 
     } catch (error) {
@@ -239,110 +250,109 @@ exports.getQRDetails = async (req, res) => {
     }
 };
 
-// Validate and Scan QR
+// Scan and Approve QR
 exports.scanQRCode = async (req, res) => {
     try {
-        const { token } = req.params;
-        // Also support body for flexibility?
-        const tokenToScan = token || req.body.token;
+        const token = req.params.token || req.body.token; 
+        const { scannedBy } = req.body;
+        const userId = parseInt(token);
 
-        if (!tokenToScan) {
-            return res.status(400).json({ error: 'Token is required' });
+        if (!token || isNaN(userId)) {
+            return res.status(400).json({ error: 'Invalid or missing User ID/Token' });
         }
 
-        const qrRecord = await db.select().from(qrCodes).where(eq(qrCodes.token, tokenToScan)).limit(1);
+        // Concurrent scan prevention: Use a transaction or select for update
+        await db.transaction(async (tx) => {
+            const userRecord = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
+            if (!userRecord.length) {
+                throw new Error('User not found');
+            }
 
-        if (!qrRecord.length) {
-            return res.status(404).json({ valid: false, message: 'Invalid QR Code' });
-        }
+            const user = userRecord[0];
+            const scanCount = user.totalScans || 0;
+            const maxScans = user.participantType === 'poster' ? 2 : 4;
 
-        const qr = qrRecord[0];
+            if (user.status === 'locked') {
+                throw new Error('Token is Locked/Disabled');
+            }
 
-        // Status Checks
-        if (qr.status === 'used') {
-            const lastScan = await db.select().from(qrScans).where(eq(qrScans.qrId, qr.id)).orderBy(desc(qrScans.scannedAt)).limit(1);
-            const scanTime = lastScan.length ? lastScan[0].scannedAt : 'unknown time';
-            return res.status(400).json({
-                valid: false,
-                message: 'Code ALREADY USED',
-                scannedAt: scanTime,
-                previouslyScannedBy: lastScan.length ? lastScan[0].scannedBy : 'unknown'
+            if (scanCount >= maxScans) {
+                throw new Error('All Meals Already Used');
+            }
+
+            // Determine meal type
+            let mealKey = '';
+            let mealLabel = '';
+            if (user.participantType === 'poster') {
+                if (scanCount === 0) { mealKey = 'day1Breakfast'; mealLabel = 'Day1 Breakfast'; }
+                else if (scanCount === 1) { mealKey = 'day1Lunch'; mealLabel = 'Day1 Lunch'; }
+            } else {
+                if (scanCount === 0) { mealKey = 'day1Breakfast'; mealLabel = 'Day1 Breakfast'; }
+                else if (scanCount === 1) { mealKey = 'day1Lunch'; mealLabel = 'Day1 Lunch'; }
+                else if (scanCount === 2) { mealKey = 'day2Breakfast'; mealLabel = 'Day2 Breakfast'; }
+                else if (scanCount === 3) { mealKey = 'day2Lunch'; mealLabel = 'Day2 Lunch'; }
+            }
+
+            // Update user scan count
+            await tx.update(users).set({
+                totalScans: scanCount + 1
+            }).where(eq(users.id, userId));
+
+            // Update meal status
+            const statusUpdate = {};
+            statusUpdate[mealKey] = 'used';
+            await tx.update(mealStatus).set(statusUpdate).where(eq(mealStatus.userId, userId));
+
+            // Log scan
+            await tx.insert(scanLogs).values({
+                userId: userId,
+                scanNumber: scanCount + 1,
+                mealType: mealLabel,
+                scannedBy: scannedBy || 'volunteer'
             });
-        }
-
-        if (qr.status === 'expired') {
-            return res.status(400).json({ valid: false, message: 'Code EXPIRED' });
-        }
-
-        if (qr.expiresAt && new Date() > new Date(qr.expiresAt)) {
-            return res.status(400).json({ valid: false, message: 'Code EXPIRED' });
-        }
-
-        // --- SUCCESS CASE ---
-
-        // Mark as used
-        await db.update(qrCodes).set({
-            status: 'used',
-            usedAt: new Date()
-        }).where(eq(qrCodes.id, qr.id));
-
-        // Create Scan Record
-        await db.insert(qrScans).values({
-            qrId: qr.id,
-            userId: qr.userId,
-            scannedBy: req.user ? req.user.id : (req.body.scannedBy || 'anonymous'), // Flexible auth
-            scannedAt: new Date(),
-            ipAddress: req.ip || req.socket.remoteAddress,
-            deviceInfo: req.headers['user-agent']
         });
-
-        // Get User Details
-        const user = await db.select().from(users).where(eq(users.id, qr.userId)).limit(1);
 
         res.json({
             valid: true,
-            message: 'Scan Successful! Access Granted.',
-            user: user[0],
-            scanTime: new Date()
+            message: 'Meal Approved'
         });
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: error.message });
+        res.status(400).json({ valid: false, message: error.message });
     }
 };
-
 
 // Fetch Stats
 exports.getStats = async (req, res) => {
     try {
-        const userCount = await db.select({ count: sql`count(*)` }).from(users);
-        const qrCount = await db.select({ count: sql`count(*)` }).from(qrCodes);
-        const scanCount = await db.select({ count: sql`count(*)` }).from(qrScans);
-
-        // Recent Scans with User Info
-        // Since we didn't setup relations in schema (exported relations), we can do manual join or just two queries.
-        // For efficiency, let's just fetch scans and then users. Or use `.leftJoin` if supported.
-        // Drizzle-orm select().leftJoin(...)
+        const totalUsers = await db.select({ count: count() }).from(users);
+        
+        // Meal served stats
+        const d1b = await db.select({ count: count() }).from(mealStatus).where(eq(mealStatus.day1Breakfast, 'used'));
+        const d1l = await db.select({ count: count() }).from(mealStatus).where(eq(mealStatus.day1Lunch, 'used'));
+        const d2b = await db.select({ count: count() }).from(mealStatus).where(eq(mealStatus.day2Breakfast, 'used'));
+        const d2l = await db.select({ count: count() }).from(mealStatus).where(eq(mealStatus.day2Lunch, 'used'));
 
         const recentScans = await db.select({
-            scanId: qrScans.id,
-            scannedAt: qrScans.scannedAt,
-            scannedBy: qrScans.scannedBy,
-            userName: users.fullName,
-            studentId: users.studentId,
-            userClass: users.class
+            scanId: scanLogs.id,
+            scanTime: scanLogs.scanTime,
+            mealType: scanLogs.mealType,
+            userName: users.name,
+            expoId: users.expoId
         })
-            .from(qrScans)
-            .leftJoin(users, eq(qrScans.userId, users.id))
-            .orderBy(desc(qrScans.scannedAt))
+            .from(scanLogs)
+            .leftJoin(users, eq(scanLogs.userId, users.id))
+            .orderBy(desc(scanLogs.scanTime))
             .limit(10);
 
         res.json({
             stats: {
-                totalUsers: userCount[0].count,
-                totalQRs: qrCount[0].count,
-                totalScans: scanCount[0].count
+                totalRegistered: totalUsers[0].count,
+                day1Breakfast: d1b[0].count,
+                day1Lunch: d1l[0].count,
+                day2Breakfast: d2b[0].count,
+                day2Lunch: d2l[0].count,
             },
             recentScans
         });
@@ -357,18 +367,17 @@ exports.getStats = async (req, res) => {
 exports.getScanHistory = async (req, res) => {
     try {
         const history = await db.select({
-            scanId: qrScans.id,
-            scannedAt: qrScans.scannedAt,
-            scannedBy: qrScans.scannedBy,
-            userName: users.fullName,
-            studentId: users.studentId,
-            userClass: users.class,
-            ipAddress: qrScans.ipAddress,
-            deviceInfo: qrScans.deviceInfo
+            scanId: scanLogs.id,
+            scanTime: scanLogs.scanTime,
+            mealType: scanLogs.mealType,
+            userName: users.name,
+            expoId: users.expoId,
+            scannedBy: scanLogs.scannedBy,
+            scanNumber: scanLogs.scanNumber
         })
-            .from(qrScans)
-            .leftJoin(users, eq(qrScans.userId, users.id))
-            .orderBy(desc(qrScans.scannedAt));
+            .from(scanLogs)
+            .leftJoin(users, eq(scanLogs.userId, users.id))
+            .orderBy(desc(scanLogs.scanTime));
 
         res.json(history);
     } catch (error) {
@@ -377,74 +386,35 @@ exports.getScanHistory = async (req, res) => {
     }
 };
 
-
-// Download specific QRs as ZIP
+// Download QRs
 exports.downloadQRs = async (req, res) => {
     try {
-        const { userIds, format } = req.body;
-        // Accepts array of userIds or filter? Maybe accept query params for filter?
-        // Body is safer for large arrays.
-
-        let targetQRs;
-        // Fetch users + tokens
-        // For simplicity, just fetch all generated tokens for requested users
+        const { userIds } = req.body;
+        let targetUsers;
         if (!userIds || userIds === 'all') {
-            targetQRs = await db.select({
-                userId: users.id,
-                studentId: users.studentId,
-                name: users.fullName,
-                token: qrCodes.token
-            })
-                .from(qrCodes)
-                .innerJoin(users, eq(qrCodes.userId, users.id));
+            targetUsers = await db.select().from(users);
         } else {
-            const isStringIds = userIds.some(id => typeof id === 'string');
-            if (isStringIds) {
-                targetQRs = await db.select({
-                    userId: users.id,
-                    studentId: users.studentId,
-                    name: users.fullName,
-                    token: qrCodes.token
-                })
-                    .from(qrCodes)
-                    .innerJoin(users, eq(qrCodes.userId, users.id))
-                    .where(inArray(users.studentId, userIds));
-            } else {
-                // Assume numeric IDs
-                targetQRs = await db.select({
-                    userId: users.id,
-                    studentId: users.studentId,
-                    name: users.fullName,
-                    token: qrCodes.token
-                })
-                    .from(qrCodes)
-                    .innerJoin(users, eq(qrCodes.userId, users.id))
-                    .where(inArray(users.id, userIds));
-            }
+            targetUsers = await db.select().from(users).where(inArray(users.id, userIds));
         }
 
-        if (targetQRs.length === 0) {
-            return res.status(404).json({ error: 'No generated QR codes found for these users' });
+        if (targetUsers.length === 0) {
+            return res.status(404).json({ error: 'No users found' });
         }
 
         const archive = archiver('zip', { zlib: { level: 9 } });
-
         res.attachment('qrcodes.zip');
         archive.pipe(res);
 
-        for (const record of targetQRs) {
-            const qrUrl = `${process.env.APP_URL || 'http://localhost:3000'}/scan/${record.token}`;
-            // Or better: Use the API endpoint for scan? Or a frontend landing page?
-            // Usually frontend URL: "t.ly/..." or direct link.
-            // Let's assume "/scan/{token}" maps to frontend route.
-
-            const buffer = await QRCode.toBuffer(qrUrl, {
+        for (const user of targetUsers) {
+            // QR stores only the user_id (as requested)
+            const qrValue = String(user.id);
+            const buffer = await QRCode.toBuffer(qrValue, {
                 errorCorrectionLevel: 'H',
                 margin: 1,
                 width: 300
             });
 
-            const filename = `${record.studentId}_${record.name.replace(/[^a-z0-9]/gi, '_')}.png`;
+            const filename = `${user.expoId || user.id}_${user.name.replace(/[^a-z0-9]/gi, '_')}.png`;
             archive.append(buffer, { name: filename });
         }
 
@@ -457,303 +427,200 @@ exports.downloadQRs = async (req, res) => {
 };
 
 // Send QR via Email
-// Send QR via Email (Single)
 exports.sendQRViaEmail = async (req, res) => {
     try {
         const { userId } = req.body;
-        if (!userId) return res.status(400).json({ error: "User ID required" });
+        const user = await db.select().from(users).where(eq(users.id, userId)).limit(1).then(rows => rows[0]);
+        if (!user || !user.email) return res.status(404).json({ error: "User or email not found" });
 
-        // Get user and their QR
-        let user = await db.select().from(users).where(eq(users.id, userId)).limit(1).then(rows => rows[0]);
-        if (!user) {
-            user = await db.select().from(users).where(eq(users.studentId, userId)).limit(1).then(rows => rows[0]);
-        }
-
-        if (!user) return res.status(404).json({ error: "User not found" });
-        if (!user.email) return res.status(400).json({ error: "User has no email address" });
-
-        const qrRecord = await db.select().from(qrCodes).where(eq(qrCodes.userId, user.id)).limit(1);
-
-        let token;
-        if (!qrRecord.length) {
-            // Auto-generate if missing?
-            token = generateToken();
-            await db.insert(qrCodes).values({
-                userId: user.id,
-                token: token,
-                status: 'unused',
-                createdAt: new Date(),
-                expiresAt: null,
-            });
-        } else {
-            token = qrRecord[0].token;
-        }
-
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000';
-        const qrUrl = `${appUrl}/scan/${token}`;
-
-        // Generate QR Image Buffer
-        const qrBuffer = await QRCode.toBuffer(qrUrl, {
+        const qrValue = String(user.id);
+        const qrBuffer = await QRCode.toBuffer(qrValue, {
             errorCorrectionLevel: 'H', margin: 1, width: 300
         });
 
-        const mailOptions = {
+        const transporter = getTransporter();
+        await transporter.sendMail({
             from: process.env.FROM_EMAIL,
             to: user.email,
-            subject: 'Your Event Access QR Code',
-            html: `
-                <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #333;">Hello ${user.fullName},</h2>
-                    <p style="font-size: 16px; color: #555;">Here is your personal QR code for the event.</p>
-                    <p style="font-size: 16px; color: #555;">Please present this at the entrance.</p>
-                    
-                    <div style="margin: 20px 0;">
-                        <img src="cid:unique-qr-code" alt="QR Code" style="width: 250px; height: 250px; border: 1px solid #ddd; padding: 10px; border-radius: 5px;" />
-                    </div>
-
-                    <p style="color: #666; font-size: 14px; background-color: #f9f9f9; padding: 10px; border-radius: 5px; display: inline-block;">ID: <strong>${user.studentId}</strong></p>
-                    
-                    <p style="margin-top: 30px; font-size: 12px; color: #999;">If the QR code does not load, please contact support.</p>
-                </div>
-            `,
-            attachments: [{
-                filename: 'qrcode.png',
-                content: qrBuffer,
-                cid: 'unique-qr-code'
-            }]
-        };
-
-        const transporter = getTransporter();
-        await transporter.sendMail(mailOptions);
+            subject: 'Your Food Access QR Code',
+            html: `<h2>Hello ${user.name},</h2><p>Your meal QR code is attached.</p>`,
+            attachments: [{ filename: 'qrcode.png', content: qrBuffer, cid: 'qr' }]
+        });
 
         res.json({ message: `Email sent to ${user.email}` });
-
     } catch (error) {
-        console.error("Email error:", error);
-        res.status(500).json({ error: "Failed to send email: " + error.message });
+        res.status(500).json({ error: error.message });
     }
 };
 
-// Send Bulk QRs via Email
+// Send Bulk Emails
 exports.sendBulkQRViaEmail = async (req, res) => {
     try {
-        const { userIds } = req.body; // Array of IDs or 'all'
-
-        let targetUsers = [];
-        if (!userIds || userIds === 'all') {
-            // Fetch all users with email
-            targetUsers = await db.select().from(users).where(sql`${users.email} IS NOT NULL AND ${users.email} != ''`);
-        } else {
-            const isStringIds = userIds.some(id => typeof id === 'string');
-            if (isStringIds) {
-                targetUsers = await db.select().from(users).where(inArray(users.studentId, userIds));
-            } else {
-                targetUsers = await db.select().from(users).where(inArray(users.id, userIds));
-            }
+        const { userIds } = req.body;
+        let targetUsers = await db.select().from(users).where(sql`${users.email} IS NOT NULL`);
+        if (userIds && userIds !== 'all') {
+            targetUsers = targetUsers.filter(u => userIds.includes(u.id));
         }
 
-        // Filter out users without email
-        targetUsers = targetUsers.filter(u => u.email);
-
-        if (targetUsers.length === 0) {
-            return res.status(404).json({ error: "No users with email addresses found for selection." });
-        }
-
-        const results = { sent: 0, failed: 0, errors: [] };
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000';
-
-        // Process in chunks to avoid overwhelming the mail server
-        // But for <100 users, sequential or small parallel is fine.
-        // Let's do sequential for safety and accurate reporting.
+        const results = { sent: 0, failed: 0 };
+        const transporter = getTransporter();
 
         for (const user of targetUsers) {
             try {
-                // Get or Create QR
-                let qrRecord = await db.select().from(qrCodes).where(eq(qrCodes.userId, user.id)).limit(1);
-                let token;
-
-                if (!qrRecord.length) {
-                    token = generateToken();
-                    await db.insert(qrCodes).values({
-                        userId: user.id,
-                        token: token,
-                        status: 'unused',
-                        createdAt: new Date(),
-                        expiresAt: null,
-                    });
-                } else {
-                    token = qrRecord[0].token;
-                }
-
-                const qrUrl = `${appUrl}/scan/${token}`;
-                const qrBuffer = await QRCode.toBuffer(qrUrl, {
-                    errorCorrectionLevel: 'H', margin: 1, width: 300
-                });
-
-                const mailOptions = {
+                const qrBuffer = await QRCode.toBuffer(String(user.id));
+                await transporter.sendMail({
                     from: process.env.FROM_EMAIL,
                     to: user.email,
-                    subject: 'Your Event Access QR Code',
-                    html: `
-                        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; max-width: 600px; margin: 0 auto;">
-                            <h2 style="color: #333;">Hello ${user.fullName},</h2>
-                            <p style="font-size: 16px; color: #555;">Here is your personal QR code for the event.</p>
-                            <p style="font-size: 16px; color: #555;">Please present this at the entrance.</p>
-                            
-                            <div style="margin: 20px 0;">
-                                <img src="cid:unique-qr-code" alt="QR Code" style="width: 250px; height: 250px; border: 1px solid #ddd; padding: 10px; border-radius: 5px;" />
-                            </div>
-
-                            <p style="color: #666; font-size: 14px; background-color: #f9f9f9; padding: 10px; border-radius: 5px; display: inline-block;">ID: <strong>${user.studentId}</strong></p>
-                            
-                            <p style="margin-top: 30px; font-size: 12px; color: #999;">If the QR code does not load, please contact support.</p>
-                        </div>
-                    `,
-                    attachments: [{
-                        filename: 'qrcode.png',
-                        content: qrBuffer,
-                        cid: 'unique-qr-code'
-                    }]
-                };
-
-                const transporter = getTransporter(); // Get fresh transporter
-                await transporter.sendMail(mailOptions);
+                    subject: 'Your Food Access QR Code',
+                    html: `<h2>Hello ${user.name},</h2><p>Your meal QR code is attached.</p>`,
+                    attachments: [{ filename: 'qrcode.png', content: qrBuffer, cid: 'qr' }]
+                });
                 results.sent++;
-
             } catch (err) {
-                console.error(`Failed to email user ${user.id}:`, err);
                 results.failed++;
-                results.errors.push({ userId: user.id, email: user.email, error: err.message });
             }
         }
-
-        res.json({
-            message: `Bulk email processing complete. Sent: ${results.sent}, Failed: ${results.failed}`,
-            details: results
-        });
-
+        res.json(results);
     } catch (error) {
-        console.error("Bulk Email error:", error);
-        res.status(500).json({ error: "Failed to process bulk emails: " + error.message });
-    }
-};
-
-
-// Delete Scan Record
-exports.deleteScanRecord = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        await db.delete(qrScans).where(eq(qrScans.id, id));
-
-        res.json({ message: "Scan record deleted successfully" });
-    } catch (error) {
-        console.error(error);
         res.status(500).json({ error: error.message });
     }
 };
 
 exports.getAllUsers = async (req, res) => {
     try {
-        // updated to left join qr_codes
-        const results = await db.select({
+        const usersList = await db.select({
             id: users.id,
-            studentId: users.studentId,
-            fullName: users.fullName,
+            name: users.name,
             email: users.email,
             mobile: users.mobile,
-            class: users.class,
-            qrToken: qrCodes.token,
-            qrStatus: qrCodes.status
+            expoId: users.expoId,
+            qrCode: users.qrCode,
+            participantType: users.participantType,
+            totalScans: users.totalScans,
+            status: users.status,
+            createdAt: users.createdAt,
+            mealStatus: {
+                day1Breakfast: mealStatus.day1Breakfast,
+                day1Lunch: mealStatus.day1Lunch,
+                day2Breakfast: mealStatus.day2Breakfast,
+                day2Lunch: mealStatus.day2Lunch,
+            }
         })
-            .from(users)
-            .leftJoin(qrCodes, eq(users.id, qrCodes.userId));
+        .from(users)
+        .leftJoin(mealStatus, eq(users.id, mealStatus.userId));
 
-        res.json(results);
+        res.json(usersList);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ error: err.message });
     }
 };
 
-// Create User
 exports.createUser = async (req, res) => {
     try {
-        const { studentId, fullName, email, mobile, class: className } = req.body;
+        const { name, email, mobile, expoId, participantType, mealStatus: mealState } = req.body;
+        
+        // Transaction for consistency
+        await db.transaction(async (tx) => {
+            const inserted = await tx.insert(users).values({ 
+                name, email, mobile, expoId, 
+                participantType: participantType || 'normal',
+                status: req.body.status || 'active'
+            }).returning({ id: users.id });
+            
+            const userId = inserted[0].id;
+            
+            // Set QR Code (using ID as string)
+            await tx.update(users).set({ qrCode: String(userId) }).where(eq(users.id, userId));
+            
+            // Initialize Meal Status
+            await tx.insert(mealStatus).values({ 
+                userId,
+                day1Breakfast: mealState?.day1Breakfast || 'not_used',
+                day1Lunch: mealState?.day1Lunch || 'not_used',
+                day2Breakfast: mealState?.day2Breakfast || 'not_used',
+                day2Lunch: mealState?.day2Lunch || 'not_used'
+            });
 
-        if (!studentId || !fullName) {
-            return res.status(400).json({ error: "Student ID and Full Name are required" });
-        }
-
-        // Check availability
-        const existing = await db.select().from(users).where(eq(users.studentId, studentId)).limit(1);
-        if (existing.length > 0) {
-            return res.status(400).json({ error: "User with this Student ID already exists" });
-        }
-
-        await db.insert(users).values({
-            studentId,
-            fullName,
-            email: email || null,
-            mobile: mobile || null,
-            class: className || null
+            // Calculate total scans if any were set manually
+            let count = 0;
+            if (mealState) {
+                if (mealState.day1Breakfast === 'used') count++;
+                if (mealState.day1Lunch === 'used') count++;
+                if (mealState.day2Breakfast === 'used') count++;
+                if (mealState.day2Lunch === 'used') count++;
+            }
+            if (count > 0) {
+                await tx.update(users).set({ totalScans: count }).where(eq(users.id, userId));
+            }
         });
 
-        res.json({ message: "User created successfully" });
+        res.json({ message: "User created and initialized" });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: error.message });
     }
 };
 
-// Update User
 exports.updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const { studentId, fullName, email, mobile, class: className } = req.body;
+        const { name, email, mobile, expoId, participantType, mealStatus: mealState } = req.body;
+        const userId = Number(id);
 
-        if (!id) return res.status(400).json({ error: "User ID required" });
+        await db.transaction(async (tx) => {
+            // Update Core User Info
+            await tx.update(users).set({ 
+                name, email, mobile, expoId, participantType,
+                status: req.body.status
+            }).where(eq(users.id, userId));
 
-        await db.update(users).set({
-            studentId,
-            fullName,
-            email: email || null,
-            mobile: mobile || null,
-            class: className || null
-        }).where(eq(users.id, Number(id)));
+            // Update Meal Status if provided
+            if (mealState) {
+                await tx.update(mealStatus).set({
+                    day1Breakfast: mealState.day1Breakfast,
+                    day1Lunch: mealState.day1Lunch,
+                    day2Breakfast: mealState.day2Breakfast,
+                    day2Lunch: mealState.day2Lunch
+                }).where(eq(mealStatus.userId, userId));
 
-        res.json({ message: "User updated successfully" });
+                // Sync totalScans count based on current mealStatus
+                let count = 0;
+                if (mealState.day1Breakfast === 'used') count++;
+                if (mealState.day1Lunch === 'used') count++;
+                if (mealState.day2Breakfast === 'used') count++;
+                if (mealState.day2Lunch === 'used') count++;
+                
+                await tx.update(users).set({ totalScans: count }).where(eq(users.id, userId));
+            }
+        });
+
+        res.json({ message: "User profile updated" });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: error.message });
     }
 };
 
-// Delete User
 exports.deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
-
-        if (!id) return res.status(400).json({ error: "User ID required" });
-
         const userId = Number(id);
-
-        // First delete related QR codes and scans
-        // 1. Get QR ID
-        const qr = await db.select().from(qrCodes).where(eq(qrCodes.userId, userId)).limit(1);
-
-        if (qr.length > 0) {
-            // Delete Scans
-            await db.delete(qrScans).where(eq(qrScans.qrId, qr[0].id));
-            // Delete QR
-            await db.delete(qrCodes).where(eq(qrCodes.id, qr[0].id));
-        }
-
-        // Delete User
+        await db.delete(scanLogs).where(eq(scanLogs.userId, userId));
+        await db.delete(mealStatus).where(eq(mealStatus.userId, userId));
         await db.delete(users).where(eq(users.id, userId));
-
-        res.json({ message: "User deleted successfully" });
+        res.json({ message: "User deleted" });
     } catch (error) {
-        console.error(error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.deleteScanRecord = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.delete(scanLogs).where(eq(scanLogs.id, id));
+        res.json({ message: "Scan record deleted" });
+    } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };

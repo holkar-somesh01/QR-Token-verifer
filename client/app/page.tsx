@@ -2,239 +2,185 @@
 import { useSession } from "next-auth/react";
 import Scanner from "@/components/Scanner";
 import Navbar from "@/components/Navbar";
-import { Loader2, RefreshCw, Smartphone, TrendingUp, Users, Clock, CheckCircle, BarChart3, XCircle } from "lucide-react";
+import { Loader2, RefreshCw, Smartphone, TrendingUp, Users, Clock, CheckCircle, BarChart3, XCircle, Coffee, Utensils, Zap } from "lucide-react";
 import { useState } from "react";
 import { useGetStatsQuery } from "@/lib/features/apiSlice";
-import Link from "next/link"; // Import Link
+import Link from "next/link";
 
 export default function Home() {
   const { data: session, status } = useSession();
   const [showScanner, setShowScanner] = useState(false);
 
-  // Using the updated getStats query that points to /qr/stats
   const { data: apiData, isLoading: statsLoading, refetch } = useGetStatsQuery(undefined, {
     pollingInterval: 5000,
     skip: !session
   });
 
-  // Map new API response to component needs
-  const stats = apiData ? {
-    total: apiData.stats?.totalUsers || 0,
-    qrs: apiData.stats?.totalQRs || 0,
-    scannedCount: apiData.stats?.totalScans || 0,
-    recent: apiData.recentScans?.map((s: any) => ({
-      name: s.userName || 'Unknown',
-      id: s.studentId || s.userId,
-      time: s.scannedAt
-    })) || []
-  } : null;
-
-  const handleRefresh = () => {
-    refetch();
-  };
-
-  if (status === "loading") return <div className="flex h-screen w-full items-center justify-center bg-gray-50"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
+  if (status === "loading") return <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors"><Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-500" /></div>;
 
   if (!session) {
     if (typeof window !== 'undefined') window.location.href = '/login';
     return null;
   }
 
-  const progress = stats && stats.total > 0 ? (stats.scannedCount / stats.total) * 100 : 0;
+  const totals = apiData?.stats || {};
+  const recent = apiData?.recentScans || [];
+  const registered = totals.totalRegistered || 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 overflow-x-hidden transition-colors duration-300">
       <Navbar />
 
       <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 space-y-10">
         {/* Command Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-200 pb-10">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-200 dark:border-slate-800 pb-10">
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse"></span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-600">Operations Control</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Event Food Matrix</span>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Scan <span className="text-slate-400">Command</span></h1>
-            <p className="mt-2 text-slate-500 font-medium">Real-time surveillance of authentication event metrics.</p>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Meal <span className="text-slate-400 dark:text-slate-600">Distribution</span></h1>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 font-medium italic">Monitoring 2-day sequential food scan telemetry.</p>
           </div>
 
           <div className="flex items-center gap-3">
-            <Link href="/users" className="hidden sm:inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold transition-all bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm">
-              <Users className="mr-2 h-4 w-4 text-slate-400" />
-              Manage Fleet
+            <Link href="/users" className="hidden sm:inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-xs font-bold uppercase bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+              <Users size={14} className="mr-2" />
+              Participants
             </Link>
             <button
-              onClick={handleRefresh}
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold transition-all bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm"
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 text-slate-400 ${statsLoading ? 'animate-spin' : ''}`} />
-              Sync Data
-            </button>
-            <button
               onClick={() => setShowScanner(!showScanner)}
-              className="inline-flex items-center justify-center px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md shadow-blue-100 bg-slate-900 text-white hover:bg-slate-800 active:scale-95"
+              className="inline-flex items-center justify-center px-8 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-blue-500/20 bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all"
             >
-              <Smartphone className="mr-2 h-4 w-4 opacity-70" />
-              {showScanner ? 'Deactivate Scanner' : 'Activate Scanner'}
+              <Smartphone size={14} className="mr-2" />
+              Launch Scanner
             </button>
           </div>
         </div>
 
-        {/* Scanner Modal Pop-up */}
+        {/* Floating Scanner Modal */}
         {showScanner && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center sm:p-4">
-            {/* Backdrop */}
-            <div
-              className="absolute inset-0 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-500"
-              onClick={() => setShowScanner(false)}
-            />
-
-            {/* Modal Content */}
-            <div className="relative w-full h-full sm:h-auto sm:max-w-xl bg-white sm:rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-12 duration-500 ease-out border border-white/20 sm:max-h-[90vh] flex flex-col">
-              {/* Header with Close Button */}
-              <div className="absolute top-4 right-4 z-[110]">
-                <button
-                  onClick={() => setShowScanner(false)}
-                  className="h-10 w-10 rounded-full bg-slate-900/50 hover:bg-slate-900/80 text-white flex items-center justify-center transition-all active:scale-90 backdrop-blur-md border border-white/10"
-                >
-                  <XCircle size={20} />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-2xl animate-in fade-in duration-500">
+             <button onClick={() => setShowScanner(false)} className="absolute top-6 right-6 z-[120] text-white/40 hover:text-white transition-all hover:scale-110 active:scale-90">
+                <XCircle size={48} strokeWidth={1} />
+             </button>
+             <div className="w-full h-full overflow-hidden">
                 <Scanner />
-              </div>
-            </div>
+             </div>
           </div>
         )}
 
-        {/* Executive Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Progress Overview */}
-          <div className="col-span-1 md:col-span-2 official-card p-8 flex flex-col justify-between relative overflow-hidden group border-l-4 border-l-blue-600 bg-white">
-            <div className="absolute top-0 right-0 p-10 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity pointer-events-none">
-              <CheckCircle size={180} />
-            </div>
-
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg w-fit text-blue-700 border border-blue-100">
-                  <TrendingUp size={14} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Entry Saturation</span>
-                </div>
-              </div>
-
-              <div className="flex items-baseline gap-3">
-                <h3 className="text-5xl font-bold text-slate-900 tracking-tighter">
-                  {stats?.scannedCount || 0}
-                </h3>
-                <span className="text-xl text-slate-300 font-bold tracking-tight">/ {stats?.total || 0} UNITS</span>
-              </div>
-              <p className="text-slate-500 mt-2 font-semibold uppercase text-xs tracking-widest">Total Verified Attendance</p>
-            </div>
-
-            <div className="mt-12 relative z-10">
-              <div className="flex justify-between text-[11px] font-bold text-slate-400 mb-2 uppercase tracking-widest">
-                <span>System Fill Rate</span>
-                <span className="text-blue-600">{progress.toFixed(1)}%</span>
-              </div>
-              <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden p-1">
-                <div className="h-full bg-blue-600 rounded-full transition-all duration-1000 ease-out shadow-[0_0_12px_rgba(37,99,235,0.4)]" style={{ width: `${progress}%` }}></div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Metrics */}
-          <div className="space-y-6">
-            <div className="official-card p-6 flex items-center gap-5 hover:translate-x-1 group bg-white">
-              <div className="h-12 w-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-all">
-                <Users size={24} />
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Database Population</p>
-                <p className="text-2xl font-bold text-slate-900 tracking-tighter">{stats?.total || 0}</p>
-              </div>
-            </div>
-
-            <div className="official-card p-6 flex items-center gap-5 hover:translate-x-1 group bg-white">
-              <div className="h-12 w-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 border border-slate-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                <BarChart3 size={24} />
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Coded Token Assets</p>
-                <p className="text-2xl font-bold text-slate-900 tracking-tighter">{stats?.qrs || 0}</p>
-              </div>
-            </div>
-          </div>
+        {/* Status Dashboard */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+          <StatCard label="Registered" value={registered} icon={<Users size={20} />} sub="Participants" color="blue" />
+          <StatCard label="D1 Breakfast" value={totals.day1Breakfast} total={registered} icon={<Coffee size={20} />} color="emerald" />
+          <StatCard label="D1 Lunch" value={totals.day1Lunch} total={registered} icon={<Utensils size={20} />} color="amber" />
+          <StatCard label="D2 Breakfast" value={totals.day2Breakfast} total={registered} icon={<Coffee size={20} />} color="indigo" />
+          <StatCard label="D2 Lunch" value={totals.day2Lunch} total={registered} icon={<Utensils size={20} />} color="rose" />
         </div>
 
-        {/* Activity Ledger */}
-        <div className="official-card overflow-hidden bg-white shadow-xl shadow-slate-200/50 border-slate-100">
-          <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 tracking-tight">Activity Ledger</h3>
-              <p className="text-xs text-slate-400 font-medium">Most recent authentication events across the network.</p>
-            </div>
-            <Link href="/attendance" className="inline-flex items-center px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border border-slate-200">
-              View Full Logs
-            </Link>
-          </div>
-
-          <div className="overflow-x-auto custom-scrollbar">
-            {(!stats?.recent || stats.recent.length === 0) ? (
-              <div className="p-24 text-center text-slate-300 flex flex-col items-center">
-                <div className="h-16 w-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4 border border-slate-100">
-                  <Clock size={24} className="text-slate-200" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Live Feed */}
+            <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] shadow-xl overflow-hidden">
+                <div className="px-8 py-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 dark:text-white">Live Scan Pulse</h3>
+                    <div className="flex items-center gap-2">
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-ping"></span>
+                        <span className="text-[10px] font-bold uppercase text-blue-500">Real-time Stream</span>
+                    </div>
                 </div>
-                <p className="font-bold text-slate-900">Ledger Standby</p>
-                <p className="text-xs text-slate-400 mt-1">Listening for incoming authentication telemetry...</p>
-              </div>
-            ) : (
-              <table className="w-full text-left border-collapse min-w-[700px]">
-                <thead>
-                  <tr className="border-b border-slate-100 text-[10px] text-slate-400 uppercase tracking-[0.2em] bg-slate-50/30">
-                    <th className="px-8 py-5 font-bold">Authorized Entity</th>
-                    <th className="px-8 py-5 font-bold">Identifier</th>
-                    <th className="px-8 py-5 font-bold">Verification Time</th>
-                    <th className="px-8 py-5 text-right font-bold">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {stats.recent.map((log: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold shadow-sm group-hover:bg-slate-900 group-hover:text-white transition-all overflow-hidden relative">
-                            {log.name.charAt(0)}
-                            <div className="absolute inset-0 bg-gradient-to-tr from-slate-200 to-transparent opacity-20"></div>
-                          </div>
-                          <span className="font-bold text-slate-900 tracking-tight">{log.name}</span>
+                <div className="divide-y divide-slate-50 dark:divide-slate-800/50">
+                    {recent.length === 0 ? (
+                        <div className="py-20 text-center opacity-30 flex flex-col items-center">
+                            <Zap size={40} className="mb-2" />
+                            <p className="text-[10px] font-black uppercase tracking-widest">Waiting for Scans...</p>
                         </div>
-                      </td>
-                      <td className="px-8 py-6 font-bold text-[11px] uppercase tracking-widest font-mono text-slate-400">{log.id}</td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-2">
-                          <Clock size={12} className="text-blue-500" />
-                          <span className="text-sm font-semibold text-slate-700">
-                            {new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6 text-right">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100">
-                          Verified
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                    ) : (
+                        recent.map((s: any, i: number) => (
+                            <div key={i} className="px-8 py-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 font-bold">
+                                        {s.userName?.[0]}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{s.userName}</p>
+                                        <p className="text-[10px] text-slate-500 font-mono italic">{s.expoId || 'no_id'}</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] font-black uppercase tracking-tighter text-blue-600 dark:text-blue-400">{s.mealType}</p>
+                                    <p className="text-[10px] text-slate-400">{new Date(s.scanTime).toLocaleTimeString()}</p>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/20 text-center border-t border-slate-50 dark:border-slate-800">
+                    <Link href="/attendance" className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">View Master Audit Logs</Link>
+                </div>
+            </div>
+
+            {/* Quick Summary Cards */}
+            <div className="space-y-6">
+                <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
+                     <TrendingUp className="absolute top-[-20px] right-[-20px] size-40 opacity-10 group-hover:scale-110 transition-transform" />
+                     <h4 className="text-[10px] font-black uppercase tracking-[.3em] mb-4 opacity-70">Efficiency Rate</h4>
+                     <p className="text-4xl font-black mb-2 tracking-tighter">
+                        {registered > 0 ? ((totals.day1Breakfast / registered) * 100).toFixed(1) : 0}%
+                     </p>
+                     <p className="text-xs font-medium opacity-80">Saturation of Day 1 Breakfast distribution against total registered users.</p>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-xl">
+                    <h4 className="text-[10px] font-black uppercase tracking-[.3em] mb-6 text-slate-400">Day 2 Outlook</h4>
+                    <div className="space-y-4">
+                        <MiniProgress label="D2 Breakfast" value={totals.day2Breakfast} total={registered} color="indigo" />
+                        <MiniProgress label="D2 Lunch" value={totals.day2Lunch} total={registered} color="rose" />
+                    </div>
+                </div>
+            </div>
         </div>
       </main>
     </div>
-
   );
+}
 
+function StatCard({ label, value, total, icon, color }: any) {
+    const colors: any = {
+        blue: "text-blue-600 bg-blue-50 border-blue-100",
+        emerald: "text-emerald-600 bg-emerald-50 border-emerald-100",
+        amber: "text-amber-600 bg-amber-50 border-amber-100",
+        indigo: "text-indigo-600 bg-indigo-50 border-indigo-100",
+    }
+    return (
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-8 rounded-[2.5rem] shadow-xl transition-all hover:translate-y-[-4px]">
+            <div className={`p-3 rounded-2xl w-fit mb-6 border ${colors[color]}`}>
+                {icon}
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{label}</p>
+            <div className="flex items-baseline gap-2">
+                <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{value || 0}</h3>
+                {total && <span className="text-xs text-slate-400 font-bold">/ {total}</span>}
+            </div>
+        </div>
+    )
+}
+
+function MiniProgress({ label, value, total, color }: any) {
+    const progress = total > 0 ? (value / total) * 100 : 0;
+    const colors: any = {
+        indigo: "bg-indigo-500",
+        rose: "bg-rose-500"
+    }
+    return (
+        <div>
+            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-1 shadow-sm">
+                <span className="text-slate-500">{label}</span>
+                <span className="text-slate-900 dark:text-white">{progress.toFixed(0)}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div className={`h-full ${colors[color]} rounded-full transition-all duration-1000 ease-out`} style={{ width: `${progress}%` }}></div>
+            </div>
+        </div>
+    )
 }
