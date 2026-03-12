@@ -83,6 +83,7 @@ export const authOptions: NextAuthOptions = {
         async jwt({ token, account, user }) {
             // Initial sign in
             if (account && user) {
+                token.provider = account.provider;
                 if (account.provider === "google") {
                     token.accessToken = account.access_token;
                     token.role = "user";
@@ -99,6 +100,7 @@ export const authOptions: NextAuthOptions = {
                 session.user.id = token.sub as string;
             }
             session.accessToken = token.accessToken as string;
+            session.provider = token.provider as string;
             return session;
         },
     },

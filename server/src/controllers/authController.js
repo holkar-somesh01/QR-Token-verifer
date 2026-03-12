@@ -84,7 +84,8 @@ exports.verifyToken = (req, res, next) => {
 
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err) {
-            return res.status(401).json({ message: 'Unauthorized' });
+            console.error("JWT Verification Error:", err.message);
+            return res.status(401).json({ message: 'Session expired or invalid token' });
         }
         req.userId = decoded.id;
         req.userRole = decoded.role;
