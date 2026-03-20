@@ -54,7 +54,7 @@ export const apiSlice = createApi({
             }),
             invalidatesTags: ['Stats'],
         }),
-        sendBulkEmails: builder.mutation<any, { userIds: string[] | 'all', subject?: string, body?: string }>({
+        sendBulkEmails: builder.mutation<any, { userIds: string[] | 'all', subject?: string, body?: string, onlyUnsent?: boolean }>({
             query: (body) => ({
                 url: '/qr/send-email/bulk',
                 method: 'POST',
