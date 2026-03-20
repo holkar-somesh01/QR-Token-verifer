@@ -16,7 +16,11 @@ export default function Scanner() {
     const scannerRef = useRef<Html5Qrcode | null>(null);
 
     // API Hooks
-    const { data: details, isLoading: detailsLoading, error: detailsError, refetch: refetchDetails } = useGetQRDetailsQuery(scannedId || "", {
+    const localDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    const { data: details, isLoading: detailsLoading, error: detailsError, refetch: refetchDetails } = useGetQRDetailsQuery({
+        token: scannedId || "",
+        date: localDate
+    }, {
         skip: !scannedId
     });
     const [approveScan, { isLoading: approveLoading }] = useScanQRMutation();
@@ -99,7 +103,8 @@ export default function Scanner() {
         try {
             await approveScan({
                 token: scannedId,
-                scannedBy: session?.user?.name || 'admin'
+                scannedBy: session?.user?.name || 'admin',
+                date: localDate
             }).unwrap();
             
             toast.success("Access Approved!", {

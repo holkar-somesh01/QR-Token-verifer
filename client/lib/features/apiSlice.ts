@@ -70,8 +70,8 @@ export const apiSlice = createApi({
             query: () => '/qr/users',
             providesTags: ['Users'],
         }),
-        getQRDetails: builder.query<any, string>({
-            query: (token) => `/qr/details/${token}`,
+        getQRDetails: builder.query<any, { token: string, date?: string }>({
+            query: ({ token, date }) => `/qr/details/${token}${date ? `?date=${date}` : ''}`,
         }),
         importUsers: builder.mutation<any, FormData>({
             query: (body) => ({

@@ -215,6 +215,7 @@ exports.getQRDetails = async (req, res) => {
         const currentDate = req.query.date || today;
 
         const scanCount = user.totalScans || 0;
+        console.log(`[Diagnostic] User: ${user.name}, Today (UTC): ${currentDate}, Event Window: ${startDate} to ${endDate}`);
         const isDateMismatch = currentDate < startDate || currentDate > endDate;
         const isCapacityExceeded = scanCount >= scanCapacity;
 
