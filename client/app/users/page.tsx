@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from 'react';
+import { toast } from 'react-hot-toast';
 import Navbar from '@/components/Navbar';
 import { useGetUsersQuery, useImportUsersMutation, useGenerateQRsMutation, useSendQRViaEmailMutation, useSendBulkEmailsMutation, useAddUserMutation, useUpdateUserMutation, useDeleteUserMutation, useImportGoogleSheetMutation, useGetSettingsQuery, useUpdateSettingsMutation } from '@/lib/features/apiSlice';
 import { useSession } from 'next-auth/react';
@@ -59,8 +60,9 @@ export default function UsersPage() {
     // Settings State
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [eventSettings, setEventSettings] = useState({
-        DAY1_DATE: '',
-        DAY2_DATE: ''
+        EVENT_START_DATE: '',
+        EVENT_END_DATE: '',
+        SCAN_CAPACITY: '4'
     });
 
     // Default professional template
@@ -86,8 +88,9 @@ export default function UsersPage() {
     useEffect(() => {
         if (dbSettings) {
             setEventSettings({
-                DAY1_DATE: dbSettings.DAY1_DATE || '',
-                DAY2_DATE: dbSettings.DAY2_DATE || ''
+                EVENT_START_DATE: dbSettings.EVENT_START_DATE || '',
+                EVENT_END_DATE: dbSettings.EVENT_END_DATE || '',
+                SCAN_CAPACITY: dbSettings.SCAN_CAPACITY || '4'
             });
         }
     }, [dbSettings]);
@@ -165,7 +168,7 @@ export default function UsersPage() {
             a.download = `qrcodes_${Date.now()}.zip`;
             a.click();
         } catch (err: any) {
-            alert("Error: " + err.message);
+            toast.error("Download failed: " + err.message);
         }
     };
 
@@ -194,9 +197,9 @@ export default function UsersPage() {
                 subject: emailSubject,
                 body: emailBody
             }).unwrap();
-            alert("QR Code sent to user's registered email.");
+            toast.success("Identity dispatched to " + user.email);
         } catch (err: any) {
-            alert("Email failed: " + (err.data?.message || err.message));
+            toast.error("Dispatch Crash: " + (err.data?.message || err.message));
         }
     };
 
@@ -211,7 +214,7 @@ export default function UsersPage() {
             }).unwrap();
             
             const summary = `Bulk Distribution Outcome:\n✅ Sent: ${res.sent}\n❌ Failed: ${res.failed}${res.lastError ? `\n\nDiagnostic Error: ${res.lastError}` : ''}`;
-            alert(summary);
+            toast.success("Bulk Distribution Executed.");
             refetch(); // Reload to see "Sent" status
             setIsEmailModalOpen(false);
             
@@ -219,7 +222,7 @@ export default function UsersPage() {
                 console.error("Bulk partial failure:", res.lastError);
             }
         } catch (err: any) {
-            alert("Bulk process crashed: " + (err.data?.message || err.message));
+            toast.error("Bulk Process Aborted: " + (err.data?.message || err.message));
         }
     };
 
@@ -229,7 +232,7 @@ export default function UsersPage() {
             await updateUser({ id: user.id, status: newStatus }).unwrap();
             refetch();
         } catch (err: any) {
-            alert("Status toggle failed: " + err.message);
+            toast.error("Lock/Unlock Failed: " + err.message);
         }
     };
 
@@ -245,7 +248,7 @@ export default function UsersPage() {
         try {
             if (editingUser) {
                 await updateUser({ id: editingUser.id, ...formData }).unwrap();
-                alert('Updated successfully');
+                toast.success('Personnel Updated');
             } else {
                 await addUser(formData).unwrap();
                 alert('Participant created');
@@ -353,12 +356,12 @@ export default function UsersPage() {
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter inline-block ${user.participantType === 'poster' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter inline-block ${user.participantType === 'poster' ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>
                                                     {user.participantType}
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter inline-block ${user.emailSent === 'yes' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400 opacity-60'}`}>
+                                                <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter inline-block ${user.emailSent === 'yes' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 opacity-60'}`}>
                                                     {user.emailSent === 'yes' ? 'Sent' : 'Pending'}
                                                 </div>
                                             </td>
@@ -378,13 +381,13 @@ export default function UsersPage() {
                                                 <div className="flex justify-end gap-2">
                                                     <button
                                                         onClick={() => handleToggleStatus(user)}
-                                                        className={`p-2 rounded-lg transition-all ${user.status === 'locked' ? 'text-rose-600 bg-rose-50' : 'text-emerald-600 bg-emerald-50'}`}
+                                                        className={`p-2 rounded-lg transition-all ${user.status === 'locked' ? 'text-rose-600 bg-rose-50 dark:bg-rose-900/30' : 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30'}`}
                                                         title={user.status === 'locked' ? "Unlock Token" : "Lock Token"}
                                                     >
                                                         {user.status === 'locked' ? <XCircle size={14} /> : <CheckCircle size={14} />}
                                                     </button>
-                                                    <button onClick={() => handleOpenEditUser(user)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"><Pencil size={14} /></button>
-                                                    <button onClick={async () => { if (confirm("Delete?")) await deleteUser({ id: user.id }); refetch(); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><Trash2 size={14} /></button>
+                                                    <button onClick={() => handleOpenEditUser(user)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-all"><Pencil size={14} /></button>
+                                                    <button onClick={async () => { if (confirm("Delete?")) await deleteUser({ id: user.id }); refetch(); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all"><Trash2 size={14} /></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -397,8 +400,8 @@ export default function UsersPage() {
                             {paginatedUsers.map((user: any) => (
                                 <div key={user.id} className="p-6 bg-slate-50 dark:bg-slate-800/30 rounded-[2rem] border border-slate-100 dark:border-slate-800 group hover:shadow-2xl transition-all">
                                     <div className="flex justify-between items-start mb-6">
-                                        <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-900 font-bold shadow-sm">{user.name?.[0]}</div>
-                                        <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${user.participantType === 'poster' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>{user.participantType}</div>
+                                        <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold shadow-sm">{user.name?.[0]}</div>
+                                        <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${user.participantType === 'poster' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>{user.participantType}</div>
                                     </div>
                                     <h3 className="font-bold text-slate-900 dark:text-white line-clamp-1">{user.name}</h3>
                                     <div className="flex flex-col mb-6">
@@ -666,39 +669,54 @@ export default function UsersPage() {
                     <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 shadow-2xl">
                         <div className="flex justify-between items-start mb-8">
                             <div>
-                                <h3 className="text-xl font-bold uppercase tracking-tighter">System settings</h3>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configure event behavior & dates.</p>
+                                <h3 className="text-xl font-bold uppercase tracking-tighter">Event Protocol</h3>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configure Duration & Scan Limits.</p>
                             </div>
                             <button onClick={() => setIsSettingsModalOpen(false)}><X size={24} className="text-slate-400" /></button>
                         </div>
 
                         <form onSubmit={handleSaveSettings} className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Day 1 Event Date</label>
-                                <input
-                                    type="date"
-                                    required
-                                    value={eventSettings.DAY1_DATE}
-                                    onChange={e => setEventSettings({ ...eventSettings, DAY1_DATE: e.target.value })}
-                                    className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold outline-none"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Start Date</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={eventSettings.EVENT_START_DATE}
+                                        onChange={e => setEventSettings({ ...eventSettings, EVENT_START_DATE: e.target.value })}
+                                        className="w-full px-5 py-3 rounded-xl bg-slate-100 dark:bg-slate-950 border border-transparent focus:border-blue-500 text-sm font-bold outline-none"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">End Date</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={eventSettings.EVENT_END_DATE}
+                                        onChange={e => setEventSettings({ ...eventSettings, EVENT_END_DATE: e.target.value })}
+                                        className="w-full px-5 py-3 rounded-xl bg-slate-100 dark:bg-slate-950 border border-transparent focus:border-blue-500 text-sm font-bold outline-none"
+                                    />
+                                </div>
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Day 2 Event Date</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Daily Scan Capacity</label>
                                 <input
-                                    type="date"
+                                    type="number"
                                     required
-                                    value={eventSettings.DAY2_DATE}
-                                    onChange={e => setEventSettings({ ...eventSettings, DAY2_DATE: e.target.value })}
+                                    min="1"
+                                    value={eventSettings.SCAN_CAPACITY}
+                                    onChange={e => setEventSettings({ ...eventSettings, SCAN_CAPACITY: e.target.value })}
                                     className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold outline-none"
+                                    placeholder="e.g. 10"
                                 />
+                                <p className="text-[9px] text-slate-400 opacity-60">Total number of scans allowed per participant across the entire duration.</p>
                             </div>
 
                             <div className="pt-4 flex gap-3">
                                 <button type="button" onClick={() => setIsSettingsModalOpen(false)} className="flex-1 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest">Cancel</button>
                                 <button type="submit" disabled={isUpdatingSettings} className="flex-[2] py-4 rounded-2xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
-                                    {isUpdatingSettings ? <Loader2 className="animate-spin" size={14} /> : 'Save settings'}
+                                    {isUpdatingSettings ? <Loader2 className="animate-spin" size={14} /> : 'Save Protocol'}
                                 </button>
                             </div>
                         </form>
@@ -712,7 +730,7 @@ export default function UsersPage() {
 function MealPip({ status, label }: { status: string, label: string }) {
     const isUsed = status === 'used';
     return (
-        <div className={`p-1.5 rounded-lg border flex flex-col items-center gap-0.5 min-w-[32px] ${isUsed ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-slate-50 border-slate-100 text-slate-300 opacity-40'}`}>
+        <div className={`p-1.5 rounded-lg border flex flex-col items-center gap-0.5 min-w-[32px] ${isUsed ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-300 dark:text-slate-600 opacity-40'}`}>
             <span className="text-[8px] font-black uppercase leading-none">{label}</span>
             {isUsed ? <CheckCircle size={10} /> : <div className="h-2 w-2 rounded-full border border-current" />}
         </div>

@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { useGetScanHistoryQuery, useDeleteScanMutation } from "@/lib/features/apiSlice";
 import { useSession } from "next-auth/react";
+import { toast } from 'react-hot-toast';
 import Navbar from "@/components/Navbar";
 import { Loader2, Calendar, Clock, Search, Download, Filter, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight, Trash2, MoreHorizontal, CheckCircle, Copy, Utensils, Coffee, RefreshCw } from "lucide-react";
 import { useState, useMemo } from "react";
@@ -25,10 +26,10 @@ export default function AttendancePage() {
         if (confirm("Are you sure you want to permanently delete this scan record?")) {
             try {
                 await deleteScan({ id: scanId }).unwrap();
-                alert("Record deleted successfully.");
+                toast.success("Audit entry purged.");
                 refetch();
             } catch (err: any) {
-                alert("Failed to delete record: " + (err.data?.error || err.message));
+                toast.error("Wipe failed: " + (err.data?.error || err.message));
             }
         }
     };
@@ -160,7 +161,7 @@ export default function AttendancePage() {
                                             <td className="px-8 py-6">
                                                 <div className="flex items-center gap-2">
                                                     {log.mealType.includes('Breakfast') ? <Coffee size={14} className="text-amber-500" /> : <Utensils size={14} className="text-blue-500" />}
-                                                    <span className="text-xs font-black uppercase tracking-tighter text-slate-700 dark:text-slate-300">{log.mealType}</span>
+                                                    <span className="text-xs font-black uppercase tracking-tighter text-slate-700 dark:text-slate-200">{log.mealType}</span>
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
@@ -170,7 +171,7 @@ export default function AttendancePage() {
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <span className="text-xs font-bold text-slate-500">{log.scannedBy}</span>
+                                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{log.scannedBy}</span>
                                             </td>
                                             <td className="px-8 py-6 text-right">
                                                 <button onClick={() => handleDelete(log.scanId)} className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-colors">

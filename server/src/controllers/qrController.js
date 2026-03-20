@@ -1,5 +1,5 @@
 const { db } = require('../../db');
-const { users, mealStatus, scanLogs, volunteers } = require('../../db/schema');
+const { users, mealStatus, scanLogs, volunteers, settings } = require('../../db/schema');
 const { eq, and, isNull, desc, inArray, sql, count } = require('drizzle-orm');
 const crypto = require('crypto');
 const XLSX = require('xlsx');
@@ -206,59 +206,30 @@ exports.getQRDetails = async (req, res) => {
         const user = userRecord[0];
         const status = await db.select().from(mealStatus).where(eq(mealStatus.userId, user.id)).limit(1).then(rows => rows[0]);
 
-        const day1Date = await getSetting('DAY1_DATE', '2026-03-27');
-        const day2Date = await getSetting('DAY2_DATE', '2026-03-28');
+        const startDate = await getSetting('EVENT_START_DATE', '2026-03-20');
+        const endDate = await getSetting('EVENT_END_DATE', '2026-03-25');
+        const scanCapacityConfig = await getSetting('SCAN_CAPACITY', '4');
+        const scanCapacity = parseInt(scanCapacityConfig);
 
-        // Determine Next Meal
-        let nextMeal = null;
-        let warning = null;
-        const scanCount = user.totalScans || 0;
-        const userStatus = user.status || 'active';
-
-        // Date Check
         const today = new Date().toISOString().split('T')[0];
-        // For testing/mocking, we might want to override today's date if provided in query
-        const mockDate = req.query.date;
-        const currentDate = mockDate || today;
+        const currentDate = req.query.date || today;
 
-        if (user.participantType === 'poster') {
-            if (scanCount === 0) {
-                nextMeal = "Day1 Breakfast";
-                if (currentDate === day2Date) warning = "Day1 Breakfast Pending";
-            } else if (scanCount === 1) {
-                nextMeal = "Day1 Lunch";
-                if (currentDate === day2Date) warning = "Day1 Lunch Pending";
-            } else {
-                nextMeal = "All Meals Finished";
-            }
-        } else {
-            // Normal
-            if (scanCount === 0) {
-                nextMeal = "Day1 Breakfast";
-                if (currentDate === day2Date) warning = "Day1 Breakfast Pending";
-            } else if (scanCount === 1) {
-                nextMeal = "Day1 Lunch";
-                if (currentDate === day2Date) warning = "Day1 Lunch Pending";
-            } else if (scanCount === 2) {
-                nextMeal = "Day2 Breakfast";
-                if (currentDate === day1Date) warning = "Early Scan: Day2 Breakfast";
-            } else if (scanCount === 3) {
-                nextMeal = "Day2 Lunch";
-                if (currentDate === day1Date) warning = "Early Scan: Day2 Lunch";
-            } else {
-                nextMeal = "All Meals Finished";
-            }
-        }
+        const scanCount = user.totalScans || 0;
+        const isDateMismatch = currentDate < startDate || currentDate > endDate;
+        const isCapacityExceeded = scanCount >= scanCapacity;
+
+        let nextMeal = `Scan #${scanCount + 1}`;
+        if (isCapacityExceeded) nextMeal = "All Quotas Used";
 
         res.json({
             valid: true,
             user,
-            mealStatus: status,
-            nextMeal,
-            warning,
             scanCount,
-            currentDate,
-            isDateMismatch: !!warning // If there's a date-related warning, we block the action
+            scanCapacity,
+            nextMeal,
+            isDateMismatch,
+            isCapacityExceeded,
+            eventSchedule: { startDate, endDate }
         });
 
     } catch (error) {
@@ -287,41 +258,27 @@ exports.scanQRCode = async (req, res) => {
 
             const user = userRecord[0];
             const scanCount = user.totalScans || 0;
-            const maxScans = user.participantType === 'poster' ? 2 : 4;
+
+            const startDate = await getSetting('EVENT_START_DATE', '2026-03-20');
+            const endDate = await getSetting('EVENT_END_DATE', '2026-03-25');
+            const scanCapacityConfig = await getSetting('SCAN_CAPACITY', '4');
+            const scanCapacity = parseInt(scanCapacityConfig);
 
             if (user.status === 'locked') {
                 throw new Error('Token is Locked/Disabled');
             }
 
-            if (scanCount >= maxScans) {
-                throw new Error('All Meals Already Used');
-            }
-
-            // Date Validation
+            // 1. Date Validation
             const today = new Date().toISOString().split('T')[0];
             const currentDate = req.body.date || today;
 
-            const day1Date = await getSetting('DAY1_DATE', '2026-03-27');
-            const day2Date = await getSetting('DAY2_DATE', '2026-03-28');
-
-            // Determine meal type and required date
-            let mealKey = '';
-            let mealLabel = '';
-            let requiredDate = '';
-
-            if (user.participantType === 'poster') {
-                if (scanCount === 0) { mealKey = 'day1Breakfast'; mealLabel = 'Day1 Breakfast'; requiredDate = day1Date; }
-                else if (scanCount === 1) { mealKey = 'day1Lunch'; mealLabel = 'Day1 Lunch'; requiredDate = day1Date; }
-            } else {
-                if (scanCount === 0) { mealKey = 'day1Breakfast'; mealLabel = 'Day1 Breakfast'; requiredDate = day1Date; }
-                else if (scanCount === 1) { mealKey = 'day1Lunch'; mealLabel = 'Day1 Lunch'; requiredDate = day1Date; }
-                else if (scanCount === 2) { mealKey = 'day2Breakfast'; mealLabel = 'Day2 Breakfast'; requiredDate = day2Date; }
-                else if (scanCount === 3) { mealKey = 'day2Lunch'; mealLabel = 'Day2 Lunch'; requiredDate = day2Date; }
+            if (currentDate < startDate || currentDate > endDate) {
+                throw new Error(`STRICT BLOCK: QR is only valid from ${startDate} to ${endDate}. (Current: ${currentDate})`);
             }
 
-            // STRICT RESTRICTION: Block if date doesn't match
-            if (currentDate !== requiredDate) {
-                throw new Error(`STRICT BLOCK: ${mealLabel} access is only valid on ${requiredDate}. (Current: ${currentDate})`);
+            // 2. Capacity Validation
+            if (scanCount >= scanCapacity) {
+                throw new Error(`ACCESS DENIED: All ${scanCapacity} scans have already been utilized for this user.`);
             }
 
             // Update user scan count
@@ -329,12 +286,8 @@ exports.scanQRCode = async (req, res) => {
                 totalScans: scanCount + 1
             }).where(eq(users.id, userId));
 
-            // Update meal status
-            const statusUpdate = {};
-            statusUpdate[mealKey] = 'used';
-            await tx.update(mealStatus).set(statusUpdate).where(eq(mealStatus.userId, userId));
-
-            // Log scan
+            // Log scan with dynamic label
+            const mealLabel = `Meal Scan #${scanCount + 1}`;
             await tx.insert(scanLogs).values({
                 userId: userId,
                 scanNumber: scanCount + 1,
@@ -758,8 +711,9 @@ exports.getSettings = async (req, res) => {
         allSettings.forEach(s => settingsMap[s.key] = s.value);
 
         // Ensure defaults are present in response if not in DB
-        if (!settingsMap['DAY1_DATE']) settingsMap['DAY1_DATE'] = '2026-03-27';
-        if (!settingsMap['DAY2_DATE']) settingsMap['DAY2_DATE'] = '2026-03-28';
+        if (!settingsMap['EVENT_START_DATE']) settingsMap['EVENT_START_DATE'] = '2026-03-20';
+        if (!settingsMap['EVENT_END_DATE']) settingsMap['EVENT_END_DATE'] = '2026-03-25';
+        if (!settingsMap['SCAN_CAPACITY']) settingsMap['SCAN_CAPACITY'] = '4';
 
         res.json(settingsMap);
     } catch (err) {

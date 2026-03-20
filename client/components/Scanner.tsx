@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import jsQR from "jsqr";
+import { toast } from "react-hot-toast";
 import { Loader2, Camera, XCircle, CheckCircle, AlertTriangle, ScanLine, RotateCcw, History, Upload, User, Smartphone, Calendar, Hash, ArrowRight, RefreshCw } from "lucide-react";
 import { useScanQRMutation, useGetQRDetailsQuery, useGetStatsQuery } from "@/lib/features/apiSlice";
 import { useSession } from "next-auth/react";
@@ -100,12 +101,16 @@ export default function Scanner() {
                 token: scannedId,
                 scannedBy: session?.user?.name || 'admin'
             }).unwrap();
-            // Optional: You could add a temporary success state here
+            
+            toast.success("Access Approved!", {
+                icon: '🎫',
+                style: { borderRadius: '24px', fontFeatureSettings: '"tnum"' }
+            });
+            
             resetScanner();
             refetchStats();
         } catch (err: any) {
-            console.error("Approval failed:", err.data?.message);
-            // Re-start scanner even on failure so it doesn't get stuck
+            toast.error(err.data?.message || "Verification Failed");
             setTimeout(() => resetScanner(), 2000);
         }
     };
@@ -223,15 +228,19 @@ export default function Scanner() {
                             </div>
                         </div>
 
-                        <div className="space-y-1.5 sm:space-y-2 mb-8 h-28 sm:h-32 overflow-y-auto pr-2 custom-scrollbar">
-                            <MealStatusRow label="Day 1 Breakfast" status={details.mealStatus.day1Breakfast} />
-                            <MealStatusRow label="Day 1 Lunch" status={details.mealStatus.day1Lunch} />
-                            {details.user.participantType !== 'poster' && (
-                                <>
-                                    <MealStatusRow label="Day 2 Breakfast" status={details.mealStatus.day2Breakfast} />
-                                    <MealStatusRow label="Day 2 Lunch" status={details.mealStatus.day2Lunch} />
-                                </>
-                            )}
+                        <div className="bg-blue-50/50 dark:bg-blue-900/10 p-5 rounded-3xl border border-blue-100 dark:border-blue-900/30 mb-8">
+                           <div className="flex justify-between items-center mb-3">
+                               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Scan Progress</p>
+                               <p className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400">
+                                   {details.scanCount} of {details.scanCapacity} utilized
+                               </p>
+                           </div>
+                           <div className="h-3 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                               <div 
+                                 className="h-full bg-blue-600 transition-all duration-1000"
+                                 style={{ width: `${Math.min((details.scanCount / details.scanCapacity) * 100, 100)}%` }}
+                               />
+                           </div>
                         </div>
 
                         <div className="flex flex-col sm:flex-row gap-3">
@@ -239,7 +248,7 @@ export default function Scanner() {
                                 Dismiss
                             </button>
                             <button
-                                disabled={details.nextMeal === "All Meals Finished" || details.user.status === 'locked' || details.isDateMismatch || approveLoading}
+                                disabled={details.isCapacityExceeded || details.user.status === 'locked' || details.isDateMismatch || approveLoading}
                                 onClick={handleApprove}
                                 className="order-1 sm:order-2 flex-[2] py-4 sm:py-5 rounded-2xl sm:rounded-[1.5rem] font-black uppercase tracking-widest text-[9px] sm:text-[10px] bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-2"
                             >
@@ -265,7 +274,7 @@ export default function Scanner() {
                                 const token = await scanFileWithJsQR(e.target.files[0]);
                                 handleDecodedToken(token);
                             } catch (err) {
-                                alert("QR Code not detected.");
+                                toast.error("QR Identity not detected.");
                             }
                         }
                     }}
