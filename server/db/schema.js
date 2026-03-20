@@ -12,6 +12,7 @@ const users = pgTable('users', {
     participantType: text('participant_type').default('normal'), // 'normal' or 'poster'
     totalScans: integer('total_scans').default(0),
     status: text('status').default('active'), // 'active' or 'locked'
+    emailSent: text('email_sent').default('no'), // 'no' or 'yes'
     createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -52,10 +53,18 @@ const admins = pgTable('admins', {
     createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Settings Table
+const settings = pgTable('settings', {
+    id: serial('id').primaryKey(),
+    key: text('key').notNull().unique(),
+    value: text('value').notNull(),
+});
+
 module.exports = {
     users,
     mealStatus,
     scanLogs,
     volunteers,
     admins,
+    settings,
 };

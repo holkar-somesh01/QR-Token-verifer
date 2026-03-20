@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
-import { useGetUsersQuery, useImportUsersMutation, useGenerateQRsMutation, useSendQRViaEmailMutation, useSendBulkEmailsMutation, useAddUserMutation, useUpdateUserMutation, useDeleteUserMutation, useImportGoogleSheetMutation } from '@/lib/features/apiSlice';
+import { useGetUsersQuery, useImportUsersMutation, useGenerateQRsMutation, useSendQRViaEmailMutation, useSendBulkEmailsMutation, useAddUserMutation, useUpdateUserMutation, useDeleteUserMutation, useImportGoogleSheetMutation, useGetSettingsQuery, useUpdateSettingsMutation } from '@/lib/features/apiSlice';
 import { useSession } from 'next-auth/react';
-import { Loader2, Upload, QrCode, Download, Search, CheckCircle, XCircle, FileSpreadsheet, Mail, MessageSquare, LayoutGrid, Table as TableIcon, Pencil, Trash2, X, Plus, Utensils, Coffee, UserCircle, ChevronLeft, ChevronRight, Globe, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Loader2, Upload, QrCode, Download, Search, CheckCircle, XCircle, FileSpreadsheet, Mail, MessageSquare, LayoutGrid, Table as TableIcon, Pencil, Trash2, X, Plus, Utensils, Coffee, UserCircle, ChevronLeft, ChevronRight, Globe, AlertTriangle, RefreshCw, Settings } from 'lucide-react';
 
 export default function UsersPage() {
     const { data: session } = useSession();
@@ -16,6 +16,8 @@ export default function UsersPage() {
     const [addUser, { isLoading: isAdding }] = useAddUserMutation();
     const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
     const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
+    const { data: dbSettings, refetch: refetchSettings } = useGetSettingsQuery();
+    const [updateSettings, { isLoading: isUpdatingSettings }] = useUpdateSettingsMutation();
 
     const [isMounted, setIsMounted] = useState(false);
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -39,7 +41,7 @@ export default function UsersPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-    
+
     // Import States
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [importType, setImportType] = useState<'file' | 'gsheet'>('file');
@@ -53,7 +55,14 @@ export default function UsersPage() {
 
     // Email Templates
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-    
+
+    // Settings State
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [eventSettings, setEventSettings] = useState({
+        DAY1_DATE: '',
+        DAY2_DATE: ''
+    });
+
     // Default professional template
     const DEFAULT_SUBJECT = "Action Required: Your Digital Access QR for {name}";
     const DEFAULT_BODY = `<h2>Welcome {name},</h2>
@@ -68,10 +77,20 @@ export default function UsersPage() {
 
     const [emailSubject, setEmailSubject] = useState(DEFAULT_SUBJECT);
     const [emailBody, setEmailBody] = useState(DEFAULT_BODY);
+    const [onlyUnsent, setOnlyUnsent] = useState(false);
 
     useEffect(() => {
         setIsMounted(true);
     }, []);
+
+    useEffect(() => {
+        if (dbSettings) {
+            setEventSettings({
+                DAY1_DATE: dbSettings.DAY1_DATE || '',
+                DAY2_DATE: dbSettings.DAY2_DATE || ''
+            });
+        }
+    }, [dbSettings]);
 
     const processedUsers = useMemo(() => {
         if (!users) return [];
@@ -91,6 +110,7 @@ export default function UsersPage() {
 
     const paginatedUsers = useMemo(() => {
         const startIndex = (currentPage - 1) * rowsPerPage;
+
         return processedUsers.slice(startIndex, startIndex + rowsPerPage);
     }, [processedUsers, currentPage, rowsPerPage]);
 
@@ -169,10 +189,10 @@ export default function UsersPage() {
 
     const handleSendEmail = async (userId: string) => {
         try {
-            await sendEmail({ 
-                userId, 
-                subject: emailSubject, 
-                body: emailBody 
+            await sendEmail({
+                userId,
+                subject: emailSubject,
+                body: emailBody
             }).unwrap();
             alert("QR Code sent to user's registered email.");
         } catch (err: any) {
@@ -181,16 +201,25 @@ export default function UsersPage() {
     };
 
     const handleSendBulk = async () => {
-        if (!confirm(`Distribute QR Codes to ${selectedUsers.length > 0 ? selectedUsers.length : 'ALL'} participants via email?`)) return;
+        if (!confirm(`Distribute QR Codes to ${selectedUsers.length > 0 ? selectedUsers.length : (onlyUnsent ? 'UNSENT ONLY' : 'ALL')} participants via email?`)) return;
         try {
-            await sendBulkEmails({ 
+            const res = await sendBulkEmails({ 
                 userIds: selectedUsers.length > 0 ? selectedUsers : 'all',
                 subject: emailSubject,
-                body: emailBody
+                body: emailBody,
+                onlyUnsent
             }).unwrap();
-            alert("Bulk distribution initiated.");
+            
+            const summary = `Bulk Distribution Outcome:\n✅ Sent: ${res.sent}\n❌ Failed: ${res.failed}${res.lastError ? `\n\nDiagnostic Error: ${res.lastError}` : ''}`;
+            alert(summary);
+            refetch(); // Reload to see "Sent" status
+            setIsEmailModalOpen(false);
+            
+            if (res.failed > 0) {
+                console.error("Bulk partial failure:", res.lastError);
+            }
         } catch (err: any) {
-            alert("Bulk failed: " + (err.data?.message || err.message));
+            alert("Bulk process crashed: " + (err.data?.message || err.message));
         }
     };
 
@@ -228,6 +257,18 @@ export default function UsersPage() {
         }
     };
 
+    const handleSaveSettings = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await updateSettings(eventSettings).unwrap();
+            alert('Settings updated successfully!');
+            setIsSettingsModalOpen(false);
+            refetchSettings();
+        } catch (err: any) {
+            alert('Update failed: ' + err.message);
+        }
+    };
+
     if (!isMounted || isLoading) return <div className="flex h-screen w-full items-center justify-center bg-white dark:bg-slate-950 transition-colors"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
 
     return (
@@ -243,23 +284,27 @@ export default function UsersPage() {
 
                 <div className="flex flex-col xl:flex-row gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-[2rem] sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl">
                     <div className="grid grid-cols-2 lg:flex gap-2 sm:gap-3 w-full xl:w-auto">
-                        <button onClick={() => { setEditingUser(null); setFormData({ name: '', email:'', expoId: '', participantType: 'normal', status: 'active', mealStatus: { day1Breakfast: 'not_used', day1Lunch: 'not_used', day2Breakfast: 'not_used', day2Lunch: 'not_used' } }); setIsUserModalOpen(true); }} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-slate-900 dark:bg-slate-800 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-1.5 sm:gap-2">
-                             <Plus size={12} className="sm:size-[14px]" /> <span className="truncate">Add User</span>
+                        <button onClick={() => { setEditingUser(null); setFormData({ name: '', email: '', expoId: '', participantType: 'normal', status: 'active', mealStatus: { day1Breakfast: 'not_used', day1Lunch: 'not_used', day2Breakfast: 'not_used', day2Lunch: 'not_used' } }); setIsUserModalOpen(true); }} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-slate-900 dark:bg-slate-800 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-1.5 sm:gap-2">
+                            <Plus size={12} className="sm:size-[14px]" /> <span className="truncate">Add User</span>
                         </button>
                         <button onClick={() => refetch()} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 hover:text-blue-500 transition-all hover:rotate-180 duration-500" title="Refresh User List">
-                             <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+                            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
                         </button>
                         <button onClick={() => setIsImportModalOpen(true)} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-slate-700 dark:text-slate-300">
-                             <FileSpreadsheet size={12} className="text-emerald-500 sm:size-[14px]" /> <span className="truncate">Import</span>
+                            <FileSpreadsheet size={12} className="text-emerald-500 sm:size-[14px]" /> <span className="truncate">Import</span>
                         </button>
                         <button onClick={() => handleGenerateQR(selectedUsers.length > 0 ? selectedUsers : 'all')} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-blue-600 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg shadow-blue-500/20">
-                             <QrCode size={12} className="sm:size-[14px]" /> <span className="truncate">Issue QR</span>
+                            <QrCode size={12} className="sm:size-[14px]" /> <span className="truncate">Issue QR</span>
                         </button>
-                        <button onClick={() => handleSendBulk()} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-slate-700 dark:text-slate-300">
-                             <Mail size={12} className="text-blue-500 sm:size-[14px]" /> <span className="truncate">Invites</span>
+                        <button 
+                            onClick={() => setIsEmailModalOpen(true)} 
+                            className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-slate-700 dark:text-slate-300"
+                        >
+                            <Mail size={12} className="text-blue-500 sm:size-[14px]" /> 
+                            <span className="truncate">Invites</span>
                         </button>
-                        <button onClick={() => setIsEmailModalOpen(true)} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 hover:text-blue-500 transition-all" title="Email Settings">
-                             <MessageSquare size={18} />
+                        <button onClick={() => setIsSettingsModalOpen(true)} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 hover:text-blue-500 transition-all" title="System Settings">
+                            <Settings size={18} />
                         </button>
                     </div>
                     <div className="relative flex-1 w-full">
@@ -280,10 +325,11 @@ export default function UsersPage() {
                                 <thead>
                                     <tr className="bg-slate-50/50 dark:bg-slate-950/30 text-[10px] uppercase font-black tracking-[0.2em] text-slate-400">
                                         <th className="px-8 py-5">
-                                             <input type="checkbox" onChange={() => setSelectedUsers(selectedUsers.length === processedUsers.length ? [] : processedUsers.map((u:any) => u.id))} checked={processedUsers.length > 0 && selectedUsers.length === processedUsers.length} />
+                                            <input type="checkbox" onChange={() => setSelectedUsers(selectedUsers.length === processedUsers.length ? [] : processedUsers.map((u: any) => u.id))} checked={processedUsers.length > 0 && selectedUsers.length === processedUsers.length} />
                                         </th>
                                         <th className="px-8 py-5">Personnel</th>
                                         <th className="px-8 py-5">Type / Class</th>
+                                        <th className="px-8 py-5">Dispatch Status</th>
                                         <th className="px-8 py-5">Meals Consumed</th>
                                         <th className="px-8 py-5 text-right">Actions</th>
                                     </tr>
@@ -312,6 +358,11 @@ export default function UsersPage() {
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
+                                                <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter inline-block ${user.emailSent === 'yes' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400 opacity-60'}`}>
+                                                    {user.emailSent === 'yes' ? 'Sent' : 'Pending'}
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
                                                 <div className="flex gap-1.5">
                                                     <MealPip status={user.mealStatus?.day1Breakfast} label="D1 B" />
                                                     <MealPip status={user.mealStatus?.day1Lunch} label="D1 L" />
@@ -325,15 +376,15 @@ export default function UsersPage() {
                                             </td>
                                             <td className="px-8 py-6 text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    <button 
-                                                        onClick={() => handleToggleStatus(user)} 
+                                                    <button
+                                                        onClick={() => handleToggleStatus(user)}
                                                         className={`p-2 rounded-lg transition-all ${user.status === 'locked' ? 'text-rose-600 bg-rose-50' : 'text-emerald-600 bg-emerald-50'}`}
                                                         title={user.status === 'locked' ? "Unlock Token" : "Lock Token"}
                                                     >
                                                         {user.status === 'locked' ? <XCircle size={14} /> : <CheckCircle size={14} />}
                                                     </button>
                                                     <button onClick={() => handleOpenEditUser(user)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"><Pencil size={14} /></button>
-                                                    <button onClick={async () => { if(confirm("Delete?")) await deleteUser({id: user.id}); refetch(); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><Trash2 size={14} /></button>
+                                                    <button onClick={async () => { if (confirm("Delete?")) await deleteUser({ id: user.id }); refetch(); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><Trash2 size={14} /></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -346,8 +397,8 @@ export default function UsersPage() {
                             {paginatedUsers.map((user: any) => (
                                 <div key={user.id} className="p-6 bg-slate-50 dark:bg-slate-800/30 rounded-[2rem] border border-slate-100 dark:border-slate-800 group hover:shadow-2xl transition-all">
                                     <div className="flex justify-between items-start mb-6">
-                                         <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-900 font-bold shadow-sm">{user.name?.[0]}</div>
-                                         <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${user.participantType === 'poster' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>{user.participantType}</div>
+                                        <div className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white dark:bg-slate-900 font-bold shadow-sm">{user.name?.[0]}</div>
+                                        <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${user.participantType === 'poster' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>{user.participantType}</div>
                                     </div>
                                     <h3 className="font-bold text-slate-900 dark:text-white line-clamp-1">{user.name}</h3>
                                     <div className="flex flex-col mb-6">
@@ -355,14 +406,14 @@ export default function UsersPage() {
                                         <p className="text-[10px] text-blue-500/70 font-medium lowercase truncate">{user.email || 'no email set'}</p>
                                     </div>
                                     <div className="flex gap-2 mb-6">
-                                         <MealPip status={user.mealStatus?.day1Breakfast} label="D1B" />
-                                         <MealPip status={user.mealStatus?.day1Lunch} label="D1L" />
-                                         {user.participantType !== 'poster' && <MealPip status={user.mealStatus?.day2Breakfast} label="D2B" />}
-                                         {user.participantType !== 'poster' && <MealPip status={user.mealStatus?.day2Lunch} label="D2L" />}
+                                        <MealPip status={user.mealStatus?.day1Breakfast} label="D1B" />
+                                        <MealPip status={user.mealStatus?.day1Lunch} label="D1L" />
+                                        {user.participantType !== 'poster' && <MealPip status={user.mealStatus?.day2Breakfast} label="D2B" />}
+                                        {user.participantType !== 'poster' && <MealPip status={user.mealStatus?.day2Lunch} label="D2L" />}
                                     </div>
                                     <div className="flex justify-between items-center pt-6 border-t border-slate-200 dark:border-slate-800">
-                                         <button onClick={() => handleOpenEditUser(user)} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-500 transition-colors">Configure Access</button>
-                                         <button onClick={() => handleSendEmail(user.id)} className="p-2 text-slate-300 hover:text-blue-500"><Mail size={16} /></button>
+                                        <button onClick={() => handleOpenEditUser(user)} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-500 transition-colors">Configure Access</button>
+                                        <button onClick={() => handleSendEmail(user.id)} className="p-2 text-slate-300 hover:text-blue-500"><Mail size={16} /></button>
                                     </div>
                                 </div>
                             ))}
@@ -371,11 +422,11 @@ export default function UsersPage() {
 
                     {/* Pagination */}
                     <div className="p-8 border-t border-slate-50 dark:border-slate-800 flex justify-between items-center">
-                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Page {currentPage} of {totalPages}</p>
-                         <div className="flex gap-2">
-                             <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-400"><ChevronLeft size={16} /></button>
-                             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-400"><ChevronRight size={16} /></button>
-                         </div>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Page {currentPage} of {totalPages}</p>
+                        <div className="flex gap-2">
+                            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-400"><ChevronLeft size={16} /></button>
+                            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-400"><ChevronRight size={16} /></button>
+                        </div>
                     </div>
                 </div>
             </main>
@@ -396,56 +447,56 @@ export default function UsersPage() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">FullName</label>
-                                    <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" placeholder="e.g. Somesh Holkar" />
+                                    <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700" placeholder="e.g. Somesh Holkar" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Address</label>
-                                    <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" placeholder="e.g. user@gmail.com" />
+                                    <input required type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700" placeholder="e.g. user@gmail.com" />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Expo Identifier</label>
-                                    <input required value={formData.expoId} onChange={e => setFormData({...formData, expoId: e.target.value})} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none" placeholder="EXPO-2026-X" />
+                                    <input required value={formData.expoId} onChange={e => setFormData({ ...formData, expoId: e.target.value })} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700" placeholder="EXPO-2026-X" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Allocation Type</label>
                                     <div className="flex gap-3 sm:gap-4">
                                         {['normal', 'poster'].map(type => (
-                                            <button key={type} type="button" onClick={() => setFormData({...formData, participantType: type})} className={`flex-1 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${formData.participantType === type ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-slate-100 dark:border-slate-800'}`}>
+                                            <button key={type} type="button" onClick={() => setFormData({ ...formData, participantType: type })} className={`flex-1 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${formData.participantType === type ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-slate-100 dark:border-slate-800'}`}>
                                                 {type}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
                             </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Security Status</label>
-                                    <div className="flex gap-3 sm:gap-4">
-                                        {[
-                                            { id: 'active', label: 'Active', icon: CheckCircle, color: 'emerald' },
-                                            { id: 'locked', label: 'Locked', icon: XCircle, color: 'rose' }
-                                        ].map(st => (
-                                            <button key={st.id} type="button" onClick={() => setFormData({...formData, status: st.id})} className={`flex-1 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${formData.status === st.id ? (st.id === 'active' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-rose-600 text-white border-rose-600') : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-slate-100 dark:border-slate-800'}`}>
-                                                <st.icon size={12} className="sm:size-[14px]" />
-                                                {st.label}
-                                            </button>
-                                        ))}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Security Status</label>
+                                <div className="flex gap-3 sm:gap-4">
+                                    {[
+                                        { id: 'active', label: 'Active', icon: CheckCircle, color: 'emerald' },
+                                        { id: 'locked', label: 'Locked', icon: XCircle, color: 'rose' }
+                                    ].map(st => (
+                                        <button key={st.id} type="button" onClick={() => setFormData({ ...formData, status: st.id })} className={`flex-1 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${formData.status === st.id ? (st.id === 'active' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-rose-600 text-white border-rose-600') : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-slate-100 dark:border-slate-800'}`}>
+                                            <st.icon size={12} className="sm:size-[14px]" />
+                                            {st.label}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
                             <div className="space-y-4">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Privilege Status Overrides</label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                                     <MealStatusControl label="Day 1 Breakfast" status={formData.mealStatus.day1Breakfast} onToggle={(s) => handleUpdateMeal('day1Breakfast', s)} />
-                                     <MealStatusControl label="Day 1 Lunch" status={formData.mealStatus.day1Lunch} onToggle={(s) => handleUpdateMeal('day1Lunch', s)} />
-                                     {formData.participantType !== 'poster' && (
-                                         <>
+                                    <MealStatusControl label="Day 1 Breakfast" status={formData.mealStatus.day1Breakfast} onToggle={(s) => handleUpdateMeal('day1Breakfast', s)} />
+                                    <MealStatusControl label="Day 1 Lunch" status={formData.mealStatus.day1Lunch} onToggle={(s) => handleUpdateMeal('day1Lunch', s)} />
+                                    {formData.participantType !== 'poster' && (
+                                        <>
                                             <MealStatusControl label="Day 2 Breakfast" status={formData.mealStatus.day2Breakfast} onToggle={(s) => handleUpdateMeal('day2Breakfast', s)} />
                                             <MealStatusControl label="Day 2 Lunch" status={formData.mealStatus.day2Lunch} onToggle={(s) => handleUpdateMeal('day2Lunch', s)} />
-                                         </>
-                                     )}
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
@@ -460,52 +511,52 @@ export default function UsersPage() {
 
             {/* Import Overlay */}
             {isImportModalOpen && (
-                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 shadow-2xl">
-                         <div className="flex justify-between items-start mb-6">
+                        <div className="flex justify-between items-start mb-6">
                             <h3 className="text-xl font-bold">Import Data</h3>
                             <button onClick={() => setIsImportModalOpen(false)}><X size={24} className="text-slate-400" /></button>
-                         </div>
-                         
-                         <div className="flex gap-4 mb-8">
-                             <button onClick={() => setImportType('file')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${importType === 'file' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-50 text-slate-400'}`}>
-                                 <FileSpreadsheet size={14} /> Excel/CSV
-                             </button>
-                             <button onClick={() => setImportType('gsheet')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${importType === 'gsheet' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-50 text-slate-400'}`}>
-                                 <Globe size={14} /> Google Sheets
-                             </button>
-                         </div>
+                        </div>
 
-                         {importType === 'file' ? (
-                             <div className="relative h-48 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 group hover:border-blue-500 transition-colors cursor-pointer mb-8">
+                        <div className="flex gap-4 mb-8">
+                            <button onClick={() => setImportType('file')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${importType === 'file' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-50 text-slate-400'}`}>
+                                <FileSpreadsheet size={14} /> Excel/CSV
+                            </button>
+                            <button onClick={() => setImportType('gsheet')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${importType === 'gsheet' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-50 text-slate-400'}`}>
+                                <Globe size={14} /> Google Sheets
+                            </button>
+                        </div>
+
+                        {importType === 'file' ? (
+                            <div className="relative h-48 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 group hover:border-blue-500 transition-colors cursor-pointer mb-8">
                                 <Upload size={32} className="text-slate-300 group-hover:text-blue-500 mb-2 transition-colors" />
                                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{file ? file.name : 'Drop .xlsx or .csv source'}</span>
                                 <input type="file" onChange={e => setFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" />
-                             </div>
-                         ) : (
-                             <div className="space-y-4 mb-8">
-                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sheet Export Link</label>
-                                 <div className="relative">
-                                     <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                     <input 
-                                        value={gsheetUrl} 
-                                        onChange={e => setGsheetUrl(e.target.value)} 
-                                        placeholder="Paste Public Link (e.g. docs.google.com/...)" 
-                                        className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold outline-none" 
-                                     />
-                                 </div>
-                                 <p className="text-[9px] text-slate-400 font-medium">Tip: Ensure the sheet is 'Public' or 'Anyone with link can view'. System will fetch headers like [Name, ExpoId, Email].</p>
-                             </div>
-                         )}
+                            </div>
+                        ) : (
+                            <div className="space-y-4 mb-8">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sheet Export Link</label>
+                                <div className="relative">
+                                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                    <input
+                                        value={gsheetUrl}
+                                        onChange={e => setGsheetUrl(e.target.value)}
+                                        placeholder="Paste Public Link (e.g. docs.google.com/...)"
+                                        className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold outline-none"
+                                    />
+                                </div>
+                                <p className="text-[9px] text-slate-400 font-medium">Tip: Ensure the sheet is 'Public' or 'Anyone with link can view'. System will fetch headers like [Name, ExpoId, Email].</p>
+                            </div>
+                        )}
 
-                         <div className="flex gap-3">
-                             <button onClick={() => setIsImportModalOpen(false)} className="flex-1 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest">Cancel</button>
-                             <button onClick={handleImport} disabled={(importType === 'file' && !file) || (importType === 'gsheet' && !gsheetUrl) || isImporting || isSyncingSheet} className="flex-[2] py-4 rounded-2xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
-                                 {isImporting || isSyncingSheet ? <Loader2 className="animate-spin" size={14} /> : 'Execute Import'}
-                             </button>
-                         </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setIsImportModalOpen(false)} className="flex-1 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest">Cancel</button>
+                            <button onClick={handleImport} disabled={(importType === 'file' && !file) || (importType === 'gsheet' && !gsheetUrl) || isImporting || isSyncingSheet} className="flex-[2] py-4 rounded-2xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+                                {isImporting || isSyncingSheet ? <Loader2 className="animate-spin" size={14} /> : 'Execute Import'}
+                            </button>
+                        </div>
                     </div>
-                 </div>
+                </div>
             )}
             {/* Email Settings Modal */}
             {isEmailModalOpen && (
@@ -523,17 +574,17 @@ export default function UsersPage() {
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Subject Blueprint</label>
-                                    <button 
+                                    <button
                                         onClick={() => { setEmailSubject(DEFAULT_SUBJECT); setEmailBody(DEFAULT_BODY); }}
                                         className="text-[9px] font-black uppercase tracking-widest text-blue-500 hover:underline"
                                     >
                                         Restore Default
                                     </button>
                                 </div>
-                                <input 
-                                    value={emailSubject} 
+                                <input
+                                    value={emailSubject}
                                     onChange={e => setEmailSubject(e.target.value)}
-                                    className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none focus:border-blue-500 transition-all" 
+                                    className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none focus:border-blue-500 transition-all"
                                     placeholder="e.g. Your Expo QR Code"
                                 />
                             </div>
@@ -546,11 +597,11 @@ export default function UsersPage() {
                                         <span className="text-[9px] bg-slate-50 dark:bg-slate-800 text-slate-400 px-2 py-1 rounded-lg font-black uppercase">{"{expoId}"}</span>
                                     </div>
                                 </div>
-                                <textarea 
-                                    value={emailBody} 
+                                <textarea
+                                    value={emailBody}
                                     onChange={e => setEmailBody(e.target.value)}
                                     rows={6}
-                                    className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none resize-none focus:border-blue-500 transition-all font-mono" 
+                                    className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none resize-none focus:border-blue-500 transition-all font-mono"
                                     placeholder="Write your email content here..."
                                 />
                             </div>
@@ -566,9 +617,9 @@ export default function UsersPage() {
                                         <p className="text-sm font-black text-slate-900 dark:text-white line-clamp-1">{emailSubject.replace(/{name}/g, 'Somesh Holkar').replace(/{expoId}/g, 'EXPO-A101')}</p>
                                     </div>
                                     <div className="prose prose-sm dark:prose-invert max-w-none">
-                                        <div 
+                                        <div
                                             className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 space-y-2 leading-relaxed"
-                                            dangerouslySetInnerHTML={{ __html: emailBody.replace(/{name}/g, 'Somesh Holkar').replace(/{expoId}/g, 'EXPO-A101') }} 
+                                            dangerouslySetInnerHTML={{ __html: emailBody.replace(/{name}/g, 'Somesh Holkar').replace(/{expoId}/g, 'EXPO-A101') }}
                                         />
                                     </div>
                                     <div className="mt-6 flex flex-col items-center gap-4 py-8 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl bg-white dark:bg-slate-900/50">
@@ -580,15 +631,77 @@ export default function UsersPage() {
                                 </div>
                             </div>
 
+                            <div className="p-6 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30 flex items-center justify-between mb-8">
+                                <div className="flex items-center gap-3">
+                                    <input 
+                                        type="checkbox" 
+                                        id="onlyUnsent"
+                                        checked={onlyUnsent} 
+                                        onChange={() => setOnlyUnsent(!onlyUnsent)} 
+                                        className="h-4 w-4 text-blue-600 rounded cursor-pointer" 
+                                    />
+                                    <label htmlFor="onlyUnsent" className="cursor-pointer">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-blue-700 dark:text-blue-400">Skip Registry Successes</p>
+                                        <p className="text-[9px] text-blue-600/60 font-medium font-bold">Only target participants marked as 'Pending' status.</p>
+                                    </label>
+                                </div>
+                            </div>
+
                             <div className="flex flex-col sm:flex-row gap-3">
                                 <button onClick={() => setIsEmailModalOpen(false)} className="order-2 sm:order-1 flex-1 py-4 sm:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 transition-all">
                                     Dismiss
                                 </button>
-                                <button onClick={() => setIsEmailModalOpen(false)} className="order-1 sm:order-2 flex-[2] py-4 sm:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20">
-                                    Save Architecture
+                                <button onClick={() => handleSendBulk()} disabled={isSendingBulk} className="order-1 sm:order-2 flex-[2] py-4 sm:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-2">
+                                     {isSendingBulk ? <Loader2 className="animate-spin" size={14} /> : <Mail size={14} />}
+                                     {isSendingBulk ? 'Distributing...' : 'Execute Group Distribution'}
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* Settings Modal */}
+            {isSettingsModalOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 shadow-2xl">
+                        <div className="flex justify-between items-start mb-8">
+                            <div>
+                                <h3 className="text-xl font-bold uppercase tracking-tighter">System settings</h3>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Configure event behavior & dates.</p>
+                            </div>
+                            <button onClick={() => setIsSettingsModalOpen(false)}><X size={24} className="text-slate-400" /></button>
+                        </div>
+
+                        <form onSubmit={handleSaveSettings} className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Day 1 Event Date</label>
+                                <input
+                                    type="date"
+                                    required
+                                    value={eventSettings.DAY1_DATE}
+                                    onChange={e => setEventSettings({ ...eventSettings, DAY1_DATE: e.target.value })}
+                                    className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold outline-none"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Day 2 Event Date</label>
+                                <input
+                                    type="date"
+                                    required
+                                    value={eventSettings.DAY2_DATE}
+                                    onChange={e => setEventSettings({ ...eventSettings, DAY2_DATE: e.target.value })}
+                                    className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold outline-none"
+                                />
+                            </div>
+
+                            <div className="pt-4 flex gap-3">
+                                <button type="button" onClick={() => setIsSettingsModalOpen(false)} className="flex-1 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest">Cancel</button>
+                                <button type="submit" disabled={isUpdatingSettings} className="flex-[2] py-4 rounded-2xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+                                    {isUpdatingSettings ? <Loader2 className="animate-spin" size={14} /> : 'Save settings'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

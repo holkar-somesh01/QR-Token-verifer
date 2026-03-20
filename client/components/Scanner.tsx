@@ -239,12 +239,13 @@ export default function Scanner() {
                                 Dismiss
                             </button>
                             <button
-                                disabled={details.nextMeal === "All Meals Finished" || details.user.status === 'locked' || approveLoading}
+                                disabled={details.nextMeal === "All Meals Finished" || details.user.status === 'locked' || details.isDateMismatch || approveLoading}
                                 onClick={handleApprove}
                                 className="order-1 sm:order-2 flex-[2] py-4 sm:py-5 rounded-2xl sm:rounded-[1.5rem] font-black uppercase tracking-widest text-[9px] sm:text-[10px] bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-2"
                             >
                                 {approveLoading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                                {details.user.status === 'locked' ? 'Unauthorized' : 'Approve Meal'}
+                                {details.user.status === 'locked' ? 'Unauthorized' : 
+                                 details.isDateMismatch ? 'Strict Block' : 'Approve Meal'}
                             </button>
                         </div>
                     </div>

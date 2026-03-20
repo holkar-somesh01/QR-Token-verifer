@@ -28,7 +28,7 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
 export const apiSlice = createApi({
     reducerPath: 'api',
     baseQuery: baseQueryWithReauth,
-    tagTypes: ['Stats', 'Users'],
+    tagTypes: ['Stats', 'Users', 'Settings'],
     endpoints: (builder) => ({
         getStats: builder.query<any, void>({
             query: () => '/qr/stats', // Updated to new stats endpoint
@@ -145,6 +145,18 @@ export const apiSlice = createApi({
             }),
             invalidatesTags: ['Users', 'Stats'],
         }),
+        getSettings: builder.query<any, void>({
+            query: () => '/qr/settings',
+            providesTags: ['Settings'],
+        }),
+        updateSettings: builder.mutation<any, any>({
+            query: (body) => ({
+                url: '/qr/settings',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: ['Settings'],
+        }),
     }),
 })
 
@@ -165,6 +177,8 @@ export const {
     useAddUserMutation,
     useUpdateUserMutation,
     useDeleteUserMutation,
-    useImportGoogleSheetMutation
+    useImportGoogleSheetMutation,
+    useGetSettingsQuery,
+    useUpdateSettingsMutation
 } = apiSlice
 

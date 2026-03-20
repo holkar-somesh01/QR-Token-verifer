@@ -41,8 +41,10 @@ router.delete('/users/:id', verifyToken, qrController.deleteUser);
 
 // Send Email (Protected)
 router.post('/send-email', verifyToken, qrController.sendQRViaEmail);
-
-// Send Bulk Emails (Protected)
 router.post('/send-email/bulk', verifyToken, qrController.sendBulkQRViaEmail);
+
+// Settings (Protected)
+router.get('/settings', verifyToken, qrController.getSettings);
+router.post('/settings', verifyToken, qrController.updateSettings);
 
 module.exports = router;

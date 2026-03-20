@@ -12,9 +12,17 @@ const { Readable } = require('stream');
 const nodemailer = require('nodemailer');
 const axios = require('axios');
 
-// Constants for Event Dates
-const DAY1_DATE = "2026-03-27";
-const DAY2_DATE = "2026-03-28";
+// Helper to get setting from DB with fallback
+const getSetting = async (key, fallback) => {
+    try {
+        const record = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
+        return record.length > 0 ? record[0].value : fallback;
+    } catch (e) {
+        return fallback;
+    }
+};
+
+// Event dates will be handled dynamically in the logic below
 
 // Helper to process a list of user rows (from Excel or JSON)
 const processImportData = async (data) => {
@@ -101,7 +109,12 @@ const getTransporter = () => {
         throw new Error("Email credentials missing in environment variables.");
     }
     return nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        pool: true,
+        maxConnections: 20,
+        maxMessages: 500,
         auth: {
             user: process.env.FROM_EMAIL,
             pass: process.env.EMAIL_PASS
@@ -193,6 +206,9 @@ exports.getQRDetails = async (req, res) => {
         const user = userRecord[0];
         const status = await db.select().from(mealStatus).where(eq(mealStatus.userId, user.id)).limit(1).then(rows => rows[0]);
 
+        const day1Date = await getSetting('DAY1_DATE', '2026-03-27');
+        const day2Date = await getSetting('DAY2_DATE', '2026-03-28');
+
         // Determine Next Meal
         let nextMeal = null;
         let warning = null;
@@ -208,10 +224,10 @@ exports.getQRDetails = async (req, res) => {
         if (user.participantType === 'poster') {
             if (scanCount === 0) {
                 nextMeal = "Day1 Breakfast";
-                if (currentDate === DAY2_DATE) warning = "Day1 Breakfast Pending";
+                if (currentDate === day2Date) warning = "Day1 Breakfast Pending";
             } else if (scanCount === 1) {
                 nextMeal = "Day1 Lunch";
-                if (currentDate === DAY2_DATE) warning = "Day1 Lunch Pending";
+                if (currentDate === day2Date) warning = "Day1 Lunch Pending";
             } else {
                 nextMeal = "All Meals Finished";
             }
@@ -219,16 +235,16 @@ exports.getQRDetails = async (req, res) => {
             // Normal
             if (scanCount === 0) {
                 nextMeal = "Day1 Breakfast";
-                if (currentDate === DAY2_DATE) warning = "Day1 Breakfast Pending";
+                if (currentDate === day2Date) warning = "Day1 Breakfast Pending";
             } else if (scanCount === 1) {
                 nextMeal = "Day1 Lunch";
-                if (currentDate === DAY2_DATE) warning = "Day1 Lunch Pending";
+                if (currentDate === day2Date) warning = "Day1 Lunch Pending";
             } else if (scanCount === 2) {
                 nextMeal = "Day2 Breakfast";
-                if (currentDate === DAY1_DATE) warning = "Early Scan: Day2 Breakfast";
+                if (currentDate === day1Date) warning = "Early Scan: Day2 Breakfast";
             } else if (scanCount === 3) {
                 nextMeal = "Day2 Lunch";
-                if (currentDate === DAY1_DATE) warning = "Early Scan: Day2 Lunch";
+                if (currentDate === day1Date) warning = "Early Scan: Day2 Lunch";
             } else {
                 nextMeal = "All Meals Finished";
             }
@@ -241,7 +257,8 @@ exports.getQRDetails = async (req, res) => {
             nextMeal,
             warning,
             scanCount,
-            currentDate
+            currentDate,
+            isDateMismatch: !!warning // If there's a date-related warning, we block the action
         });
 
     } catch (error) {
@@ -280,17 +297,31 @@ exports.scanQRCode = async (req, res) => {
                 throw new Error('All Meals Already Used');
             }
 
-            // Determine meal type
+            // Date Validation
+            const today = new Date().toISOString().split('T')[0];
+            const currentDate = req.body.date || today;
+
+            const day1Date = await getSetting('DAY1_DATE', '2026-03-27');
+            const day2Date = await getSetting('DAY2_DATE', '2026-03-28');
+
+            // Determine meal type and required date
             let mealKey = '';
             let mealLabel = '';
+            let requiredDate = '';
+
             if (user.participantType === 'poster') {
-                if (scanCount === 0) { mealKey = 'day1Breakfast'; mealLabel = 'Day1 Breakfast'; }
-                else if (scanCount === 1) { mealKey = 'day1Lunch'; mealLabel = 'Day1 Lunch'; }
+                if (scanCount === 0) { mealKey = 'day1Breakfast'; mealLabel = 'Day1 Breakfast'; requiredDate = day1Date; }
+                else if (scanCount === 1) { mealKey = 'day1Lunch'; mealLabel = 'Day1 Lunch'; requiredDate = day1Date; }
             } else {
-                if (scanCount === 0) { mealKey = 'day1Breakfast'; mealLabel = 'Day1 Breakfast'; }
-                else if (scanCount === 1) { mealKey = 'day1Lunch'; mealLabel = 'Day1 Lunch'; }
-                else if (scanCount === 2) { mealKey = 'day2Breakfast'; mealLabel = 'Day2 Breakfast'; }
-                else if (scanCount === 3) { mealKey = 'day2Lunch'; mealLabel = 'Day2 Lunch'; }
+                if (scanCount === 0) { mealKey = 'day1Breakfast'; mealLabel = 'Day1 Breakfast'; requiredDate = day1Date; }
+                else if (scanCount === 1) { mealKey = 'day1Lunch'; mealLabel = 'Day1 Lunch'; requiredDate = day1Date; }
+                else if (scanCount === 2) { mealKey = 'day2Breakfast'; mealLabel = 'Day2 Breakfast'; requiredDate = day2Date; }
+                else if (scanCount === 3) { mealKey = 'day2Lunch'; mealLabel = 'Day2 Lunch'; requiredDate = day2Date; }
+            }
+
+            // STRICT RESTRICTION: Block if date doesn't match
+            if (currentDate !== requiredDate) {
+                throw new Error(`STRICT BLOCK: ${mealLabel} access is only valid on ${requiredDate}. (Current: ${currentDate})`);
             }
 
             // Update user scan count
@@ -433,7 +464,8 @@ exports.sendQRViaEmail = async (req, res) => {
         const user = await db.select().from(users).where(eq(users.id, userId)).limit(1).then(rows => rows[0]);
         if (!user || !user.email) return res.status(404).json({ error: "User or email not found" });
 
-        const qrValue = String(user.id);
+        const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+        const qrValue = `${baseUrl}/scan/${user.id}`;
         const qrBuffer = await QRCode.toBuffer(qrValue, {
             errorCorrectionLevel: 'H', margin: 1, width: 300
         });
@@ -447,9 +479,36 @@ exports.sendQRViaEmail = async (req, res) => {
             from: process.env.FROM_EMAIL,
             to: user.email,
             subject: finalSubject,
-            html: `${finalBody}<br/><img src="cid:qr"/>`,
-            attachments: [{ filename: 'qrcode.png', content: qrBuffer, cid: 'qr' }]
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: auto;">
+                    ${finalBody.replace(/\n/g, '<br/>')}
+                    <div style="margin-top: 20px; text-align: center; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+                        <p style="font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">Your Digital Identity</p>
+                        <img src="cid:qr" width="220" style="display: block; margin: 0 auto;"/>
+                        <p style="font-size: 12px; color: #444; margin-top: 10px;"><b>Expo ID: ${user.expoId || user.id}</b></p>
+                    </div>
+                    <p style="font-size: 12px; color: #666; font-style: italic; margin-top: 20px;">
+                        A downloadable copy of your QR code is also attached to this email for your convenience.
+                    </p>
+                </div>
+            `,
+            attachments: [
+                { 
+                    filename: 'identity.png', 
+                    content: qrBuffer, 
+                    cid: 'qr', 
+                    contentDisposition: 'inline' 
+                },
+                { 
+                    filename: `EXPO_QR_${user.expoId || user.id}.png`, 
+                    content: qrBuffer, 
+                    contentDisposition: 'attachment' 
+                }
+            ]
         });
+
+        // Mark as sent in DB
+        await db.update(users).set({ emailSent: 'yes' }).where(eq(users.id, user.id));
 
         res.json({ message: `Email sent to ${user.email}` });
     } catch (error) {
@@ -461,37 +520,90 @@ exports.sendQRViaEmail = async (req, res) => {
 // Send Bulk Emails
 exports.sendBulkQRViaEmail = async (req, res) => {
     try {
-        const { userIds, subject, body } = req.body;
-        let targetUsers = await db.select().from(users).where(sql`${users.email} IS NOT NULL`);
+        const { userIds, subject, body, onlyUnsent } = req.body;
+        
+        let targetUsers = await db.select().from(users).where(
+            onlyUnsent === true 
+            ? sql`${users.email} IS NOT NULL AND ${users.email} != '' AND ${users.emailSent} = 'no'`
+            : sql`${users.email} IS NOT NULL AND ${users.email} != ''`
+        );
         if (userIds && userIds !== 'all') {
-            targetUsers = targetUsers.filter(u => userIds.includes(u.id));
+            const idSet = new Set(userIds.map(String));
+            targetUsers = targetUsers.filter(u => idSet.has(String(u.id)));
         }
 
         const results = { sent: 0, failed: 0 };
         const transporter = getTransporter();
+        let lastError = null;
 
-        for (const user of targetUsers) {
-            try {
-                const qrBuffer = await QRCode.toBuffer(String(user.id));
+        // Grouping logic: Process in chunks of 50 for large datasets (e.g., 1000 users)
+        const chunkSize = 50;
+        for (let i = 0; i < targetUsers.length; i += chunkSize) {
+            const chunk = targetUsers.slice(i, i + chunkSize);
+            console.log(`[BULK] PROCESING BATCH ${Math.floor(i / chunkSize) + 1}/${Math.ceil(targetUsers.length/chunkSize)} (${chunk.length} participants)`);
 
-                // Placeholder replacement
-                const finalSubject = (subject || 'Your Food Access QR Code').replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
-                const finalBody = (body || `<h2>Hello {name},</h2><p>Your meal QR code is attached.</p>`).replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
+            // Send batch concurrently to be faster but stable
+            const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+            await Promise.all(chunk.map(async (user) => {
+                try {
+                    const qrValue = `${baseUrl}/scan/${user.id}`;
+                    const qrBuffer = await QRCode.toBuffer(qrValue);
 
-                await transporter.sendMail({
-                    from: process.env.FROM_EMAIL,
-                    to: user.email,
-                    subject: finalSubject,
-                    html: `${finalBody}<br/><img src="cid:qr"/>`,
-                    attachments: [{ filename: 'qrcode.png', content: qrBuffer, cid: 'qr' }]
-                });
-                results.sent++;
-            } catch (err) {
-                console.error(`Failed to send to ${user.email}:`, err);
-                results.failed++;
+                    const finalSubject = (subject || 'Your Food Access QR Code').replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
+                    const finalBody = (body || `<h2>Hello {name},</h2><p>Your meal QR code is attached.</p>`).replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
+
+                    await transporter.sendMail({
+                        from: process.env.FROM_EMAIL,
+                        to: user.email,
+                        subject: finalSubject,
+                        html: `
+                            <div style="font-family: sans-serif; max-width: 600px; margin: auto;">
+                                ${finalBody.replace(/\n/g, '<br/>')}
+                                <div style="margin-top: 20px; text-align: center; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+                                    <p style="font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">Your Digital Identity</p>
+                                    <img src="cid:qr" width="220" style="display: block; margin: 0 auto;"/>
+                                    <p style="font-size: 12px; color: #444; margin-top: 10px;"><b>Expo ID: ${user.expoId || user.id}</b></p>
+                                </div>
+                                <p style="font-size: 12px; color: #666; font-style: italic; margin-top: 20px;">
+                                    A downloadable copy of your QR code is also attached to this email for your convenience.
+                                </p>
+                            </div>
+                        `,
+                        attachments: [
+                            { 
+                                filename: 'identity.png', 
+                                content: qrBuffer, 
+                                cid: 'qr', 
+                                contentDisposition: 'inline' 
+                            },
+                            { 
+                                filename: `EXPO_QR_${user.expoId || user.id}.png`, 
+                                content: qrBuffer, 
+                                contentDisposition: 'attachment' 
+                            }
+                        ]
+                    });
+                    
+                    // Mark as sent in DB
+                    await db.update(users).set({ emailSent: 'yes' }).where(eq(users.id, user.id));
+                    
+                    results.sent++;
+                } catch (err) {
+                    console.error(`[BULK ERROR] ${user.email}:`, err.message);
+                    lastError = err.message;
+                    results.failed++;
+                }
+            }));
+
+            console.log(`[BULK PROGRESS] Sent ${results.sent} of ${targetUsers.length} total.`);
+
+            // Pause between batches to avoid throttle/spam limits (500ms)
+            if (i + chunkSize < targetUsers.length) {
+                await new Promise(res => setTimeout(res, 500));
             }
         }
-        res.json(results);
+
+        res.json({ ...results, lastError });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: error.message });
@@ -510,6 +622,7 @@ exports.getAllUsers = async (req, res) => {
             participantType: users.participantType,
             totalScans: users.totalScans,
             status: users.status,
+            emailSent: users.emailSent,
             createdAt: users.createdAt,
             mealStatus: {
                 day1Breakfast: mealStatus.day1Breakfast,
@@ -634,5 +747,39 @@ exports.deleteScanRecord = async (req, res) => {
         res.json({ message: "Scan record deleted" });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+};
+
+// Settings CRUD
+exports.getSettings = async (req, res) => {
+    try {
+        const allSettings = await db.select().from(settings);
+        const settingsMap = {};
+        allSettings.forEach(s => settingsMap[s.key] = s.value);
+
+        // Ensure defaults are present in response if not in DB
+        if (!settingsMap['DAY1_DATE']) settingsMap['DAY1_DATE'] = '2026-03-27';
+        if (!settingsMap['DAY2_DATE']) settingsMap['DAY2_DATE'] = '2026-03-28';
+
+        res.json(settingsMap);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+exports.updateSettings = async (req, res) => {
+    try {
+        const newSettings = req.body; // e.g., { DAY1_DATE: '2026-03-27', ... }
+        for (const [key, value] of Object.entries(newSettings)) {
+            const existing = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
+            if (existing.length > 0) {
+                await db.update(settings).set({ value }).where(eq(settings.key, key));
+            } else {
+                await db.insert(settings).values({ key, value });
+            }
+        }
+        res.json({ message: "Settings updated successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 };
