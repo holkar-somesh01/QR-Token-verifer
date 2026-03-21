@@ -33,6 +33,7 @@ export const apiSlice = createApi({
         getStats: builder.query<any, void>({
             query: () => '/qr/stats', // Updated to new stats endpoint
             providesTags: ['Stats'],
+            keepUnusedDataFor: 30,
         }),
         syncSheet: builder.mutation<any, void>({
             query: () => ({
@@ -46,7 +47,7 @@ export const apiSlice = createApi({
             }),
             invalidatesTags: ['Stats'],
         }),
-        scanQR: builder.mutation<any, { hash?: string, token?: string, deviceId?: string, scannedBy?: string }>({
+        scanQR: builder.mutation<any, { hash?: string, token?: string, deviceId?: string, scannedBy?: string, date?: string }>({
             query: (body) => ({
                 url: '/qr/scan',
                 method: 'POST',
@@ -65,6 +66,7 @@ export const apiSlice = createApi({
         getQRStats: builder.query<any, void>({
             query: () => '/qr/stats',
             providesTags: ['Stats'],
+            keepUnusedDataFor: 30,
         }),
         getUsers: builder.query<any, void>({
             query: () => '/qr/users',

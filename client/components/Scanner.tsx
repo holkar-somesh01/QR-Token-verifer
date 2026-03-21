@@ -113,7 +113,6 @@ export default function Scanner() {
             });
             
             resetScanner();
-            refetchStats();
         } catch (err: any) {
             toast.error(err.data?.message || "Verification Failed");
             setTimeout(() => resetScanner(), 2000);
@@ -217,27 +216,24 @@ export default function Scanner() {
 
                         <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-8">
                             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100 dark:border-white/5">
-                                <p className="text-[8px] sm:text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-2 sm:mb-3">Expected</p>
-                                <p className={`text-sm sm:text-xl font-black uppercase tracking-tighter ${details.nextMeal === "All Meals Finished" ? "text-rose-500" : "text-blue-600"}`}>
-                                    {details.nextMeal === "Day1 Breakfast" ? "D1 B-fast" :
-                                        details.nextMeal === "Day1 Lunch" ? "D1 Lunch" :
-                                            details.nextMeal === "Day2 Breakfast" ? "D2 B-fast" :
-                                                details.nextMeal === "Day2 Lunch" ? "D2 Lunch" : details.nextMeal}
+                                <p className="text-[8px] sm:text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-2 sm:mb-3">System Label</p>
+                                <p className={`text-sm sm:text-xl font-black uppercase tracking-tighter ${details.isCapacityExceeded ? "text-rose-500" : "text-blue-600"}`}>
+                                    {details.nextMeal}
                                 </p>
                             </div>
                             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border border-slate-100 dark:border-white/5">
-                                <p className="text-[8px] sm:text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-2 sm:mb-3">Audit</p>
+                                <p className="text-[8px] sm:text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-2 sm:mb-3">Current Audit</p>
                                 <p className="text-sm sm:text-xl font-black uppercase tracking-tighter text-slate-900 dark:text-white">
-                                    {details.scanCount}<span className="text-slate-300 dark:text-slate-700 mx-1">/</span>{details.user.participantType === 'poster' ? 2 : 4}
+                                    {details.scanCount}<span className="text-slate-300 dark:text-slate-700 mx-1">/</span>{details.scanCapacity}
                                 </p>
                             </div>
                         </div>
 
                         <div className="bg-blue-50/50 dark:bg-blue-900/10 p-5 rounded-3xl border border-blue-100 dark:border-blue-900/30 mb-8">
                            <div className="flex justify-between items-center mb-3">
-                               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Scan Progress</p>
+                               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Daily Scan Allowance</p>
                                <p className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400">
-                                   {details.scanCount} of {details.scanCapacity} utilized
+                                   {details.scanCount} of {details.scanCapacity} consumed (Today)
                                </p>
                            </div>
                            <div className="h-3 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">

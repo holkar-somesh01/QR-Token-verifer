@@ -204,29 +204,40 @@ exports.getQRDetails = async (req, res) => {
         }
 
         const user = userRecord[0];
-        const status = await db.select().from(mealStatus).where(eq(mealStatus.userId, user.id)).limit(1).then(rows => rows[0]);
-
+        
         const startDate = await getSetting('EVENT_START_DATE', '2026-03-20');
         const endDate = await getSetting('EVENT_END_DATE', '2026-03-25');
-        const scanCapacityConfig = await getSetting('SCAN_CAPACITY', '4');
-        const scanCapacity = parseInt(scanCapacityConfig);
+        const scanCapacityConfig = await getSetting('SCAN_CAPACITY', '10');
+        const dailyScanLimit = parseInt(scanCapacityConfig);
 
         const today = new Date().toISOString().split('T')[0];
         const currentDate = req.query.date || today;
 
-        const scanCount = user.totalScans || 0;
-        console.log(`[Diagnostic] User: ${user.name}, Today (UTC): ${currentDate}, Event Window: ${startDate} to ${endDate}`);
-        const isDateMismatch = currentDate < startDate || currentDate > endDate;
-        const isCapacityExceeded = scanCount >= scanCapacity;
+        // Count scans for this specific user on "currentDate"
+        const dailyScansRecord = await db.select({ count: count() })
+            .from(scanLogs)
+            .where(and(
+                eq(scanLogs.userId, user.id),
+                sql`DATE(${scanLogs.scanTime}) = ${currentDate}`
+            ));
+        
+        const todayScanCount = dailyScansRecord[0].count;
+        const totalScanCount = user.totalScans || 0;
 
-        let nextMeal = `Scan #${scanCount + 1}`;
-        if (isCapacityExceeded) nextMeal = "All Quotas Used";
+        console.log(`[Diagnostic] User: ${user.name}, Date: ${currentDate}, Daily Scans: ${todayScanCount}/${dailyScanLimit}`);
+        
+        const isDateMismatch = currentDate < startDate || currentDate > endDate;
+        const isCapacityExceeded = todayScanCount >= dailyScanLimit;
+
+        let nextMeal = `Scan ${todayScanCount + 1} of ${dailyScanLimit} (Today)`;
+        if (isCapacityExceeded) nextMeal = "Daily Quota Used";
 
         res.json({
             valid: true,
             user,
-            scanCount,
-            scanCapacity,
+            scanCount: todayScanCount,
+            totalScanCount: totalScanCount,
+            scanCapacity: dailyScanLimit,
             nextMeal,
             isDateMismatch,
             isCapacityExceeded,
@@ -258,16 +269,14 @@ exports.scanQRCode = async (req, res) => {
             }
 
             const user = userRecord[0];
-            const scanCount = user.totalScans || 0;
-
-            const startDate = await getSetting('EVENT_START_DATE', '2026-03-20');
-            const endDate = await getSetting('EVENT_END_DATE', '2026-03-25');
-            const scanCapacityConfig = await getSetting('SCAN_CAPACITY', '4');
-            const scanCapacity = parseInt(scanCapacityConfig);
-
             if (user.status === 'locked') {
                 throw new Error('Token is Locked/Disabled');
             }
+
+            const startDate = await getSetting('EVENT_START_DATE', '2026-03-20');
+            const endDate = await getSetting('EVENT_END_DATE', '2026-03-25');
+            const scanCapacityConfig = await getSetting('SCAN_CAPACITY', '10');
+            const dailyScanLimit = parseInt(scanCapacityConfig);
 
             // 1. Date Validation
             const today = new Date().toISOString().split('T')[0];
@@ -277,21 +286,30 @@ exports.scanQRCode = async (req, res) => {
                 throw new Error(`STRICT BLOCK: QR is only valid from ${startDate} to ${endDate}. (Current: ${currentDate})`);
             }
 
-            // 2. Capacity Validation
-            if (scanCount >= scanCapacity) {
-                throw new Error(`ACCESS DENIED: All ${scanCapacity} scans have already been utilized for this user.`);
+            // 2. Daily Capacity Validation
+            const dailyScansRecord = await tx.select({ count: count() })
+                .from(scanLogs)
+                .where(and(
+                    eq(scanLogs.userId, userId),
+                    sql`DATE(${scanLogs.scanTime}) = ${currentDate}`
+                ));
+            
+            const todayScanCount = dailyScansRecord[0].count;
+
+            if (todayScanCount >= dailyScanLimit) {
+                throw new Error(`ACCESS DENIED: Daily limit of ${dailyScanLimit} scans reached for today.`);
             }
 
-            // Update user scan count
+            // Update user total scan count
             await tx.update(users).set({
-                totalScans: scanCount + 1
+                totalScans: (user.totalScans || 0) + 1
             }).where(eq(users.id, userId));
 
             // Log scan with dynamic label
-            const mealLabel = `Meal Scan #${scanCount + 1}`;
+            const mealLabel = `Meal Scan #${todayScanCount + 1} (Date: ${currentDate})`;
             await tx.insert(scanLogs).values({
                 userId: userId,
-                scanNumber: scanCount + 1,
+                scanNumber: todayScanCount + 1,
                 mealType: mealLabel,
                 scannedBy: scannedBy || 'volunteer'
             });
@@ -311,14 +329,37 @@ exports.scanQRCode = async (req, res) => {
 // Fetch Stats
 exports.getStats = async (req, res) => {
     try {
+        const startDate = await getSetting('EVENT_START_DATE', '2026-03-20');
+        const day2Date = new Date(startDate);
+        day2Date.setDate(day2Date.getDate() + 1);
+        const day2Str = day2Date.toISOString().split('T')[0];
+
+        // 1. Total Registered
         const totalUsers = await db.select({ count: count() }).from(users);
+        const registered = Number(totalUsers[0].count);
 
-        // Meal served stats
-        const d1b = await db.select({ count: count() }).from(mealStatus).where(eq(mealStatus.day1Breakfast, 'used'));
-        const d1l = await db.select({ count: count() }).from(mealStatus).where(eq(mealStatus.day1Lunch, 'used'));
-        const d2b = await db.select({ count: count() }).from(mealStatus).where(eq(mealStatus.day2Breakfast, 'used'));
-        const d2l = await db.select({ count: count() }).from(mealStatus).where(eq(mealStatus.day2Lunch, 'used'));
+        // 2. Day 1 Scans
+        const d1Scans = await db.select({ count: sql`count(distinct ${scanLogs.userId})` })
+            .from(scanLogs)
+            .where(sql`DATE(${scanLogs.scanTime}) = ${startDate}`);
+        const d1Total = await db.select({ count: count() })
+            .from(scanLogs)
+            .where(sql`DATE(${scanLogs.scanTime}) = ${startDate}`);
 
+        // 3. Day 2 Scans
+        const d2Scans = await db.select({ count: sql`count(distinct ${scanLogs.userId})` })
+            .from(scanLogs)
+            .where(sql`DATE(${scanLogs.scanTime}) = ${day2Str}`);
+        const d2Total = await db.select({ count: count() })
+            .from(scanLogs)
+            .where(sql`DATE(${scanLogs.scanTime}) = ${day2Str}`);
+
+        const d1Count = Number(d1Scans[0].count);
+        const d1TotalCount = Number(d1Total[0].count);
+        const d2Count = Number(d2Scans[0].count);
+        const d2TotalCount = Number(d2Total[0].count);
+
+        // 4. Fetch Recent Scans
         const recentScans = await db.select({
             scanId: scanLogs.id,
             scanTime: scanLogs.scanTime,
@@ -333,11 +374,11 @@ exports.getStats = async (req, res) => {
 
         res.json({
             stats: {
-                totalRegistered: totalUsers[0].count,
-                day1Breakfast: d1b[0].count,
-                day1Lunch: d1l[0].count,
-                day2Breakfast: d2b[0].count,
-                day2Lunch: d2l[0].count,
+                totalRegistered: registered,
+                day1Breakfast: d1Count, 
+                day1Lunch: d1TotalCount,
+                day2Breakfast: d2Count, 
+                day2Lunch: d2TotalCount
             },
             recentScans
         });
@@ -714,7 +755,7 @@ exports.getSettings = async (req, res) => {
         // Ensure defaults are present in response if not in DB
         if (!settingsMap['EVENT_START_DATE']) settingsMap['EVENT_START_DATE'] = '2026-03-20';
         if (!settingsMap['EVENT_END_DATE']) settingsMap['EVENT_END_DATE'] = '2026-03-25';
-        if (!settingsMap['SCAN_CAPACITY']) settingsMap['SCAN_CAPACITY'] = '4';
+        if (!settingsMap['SCAN_CAPACITY']) settingsMap['SCAN_CAPACITY'] = '10';
 
         res.json(settingsMap);
     } catch (err) {

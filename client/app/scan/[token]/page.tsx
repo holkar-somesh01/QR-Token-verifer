@@ -11,7 +11,11 @@ export default function ScanPage() {
     const token = params?.token as string;
 
     // Skip query if no token
-    const { data, isLoading, error } = useGetQRDetailsQuery(token, {
+    const localDate = new Date().toLocaleDateString('en-CA');
+    const { data, isLoading, error } = useGetQRDetailsQuery({
+        token,
+        date: localDate
+    }, {
         skip: !token
     });
 
@@ -104,13 +108,13 @@ export default function ScanPage() {
 
                     {/* User Details */}
                     <div className="px-8 pb-10 text-center">
-                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight mb-1">{user.fullName}</h1>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest font-mono mb-6">{user.studentId}</p>
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight mb-1">{user.name}</h1>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest font-mono mb-6">{user.expoId || `#${user.id}`}</p>
 
                         <div className="grid grid-cols-2 gap-4 mb-8">
                             <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Department</p>
-                                <p className="text-sm font-bold text-slate-700">{user.class || 'N/A'}</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Access Tier</p>
+                                <p className="text-sm font-bold text-slate-700 capitalize">{user.participantType || 'Normal'}</p>
                             </div>
                             <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Status</p>

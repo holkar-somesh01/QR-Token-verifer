@@ -62,7 +62,7 @@ export default function UsersPage() {
     const [eventSettings, setEventSettings] = useState({
         EVENT_START_DATE: '',
         EVENT_END_DATE: '',
-        SCAN_CAPACITY: '4'
+        SCAN_CAPACITY: '10'
     });
 
     // Default professional template
@@ -90,7 +90,7 @@ export default function UsersPage() {
             setEventSettings({
                 EVENT_START_DATE: dbSettings.EVENT_START_DATE || '',
                 EVENT_END_DATE: dbSettings.EVENT_END_DATE || '',
-                SCAN_CAPACITY: dbSettings.SCAN_CAPACITY || '4'
+                SCAN_CAPACITY: dbSettings.SCAN_CAPACITY || '10'
             });
         }
     }, [dbSettings]);
@@ -197,7 +197,7 @@ export default function UsersPage() {
                 subject: emailSubject,
                 body: emailBody
             }).unwrap();
-            toast.success("Identity dispatched to " + user.email);
+            toast.success("Identity dispatched successfully.");
         } catch (err: any) {
             toast.error("Dispatch Crash: " + (err.data?.message || err.message));
         }
@@ -710,7 +710,7 @@ export default function UsersPage() {
                                     className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm font-bold outline-none"
                                     placeholder="e.g. 10"
                                 />
-                                <p className="text-[9px] text-slate-400 opacity-60">Total number of scans allowed per participant across the entire duration.</p>
+                                <p className="text-[9px] text-slate-400 opacity-60">Number of scans allowed per participant per day.</p>
                             </div>
 
                             <div className="pt-4 flex gap-3">

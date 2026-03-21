@@ -12,8 +12,10 @@ export default function Home() {
   const [showScanner, setShowScanner] = useState(false);
 
   const { data: apiData, isLoading: statsLoading, refetch } = useGetStatsQuery(undefined, {
-    pollingInterval: 2000,
-    skip: !session
+    pollingInterval: 10000, 
+    skip: !session,
+    refetchOnFocus: true,
+    refetchOnMountOrArgChange: true
   });
 
   if (status === "loading") return <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors"><Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-500" /></div>;
@@ -80,10 +82,10 @@ export default function Home() {
         {/* Status Dashboard */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
           <StatCard label="Registered" value={registered} icon={<Users className="size-4 sm:size-5" />} sub="Participants" color="blue" />
-          <StatCard label="D1 Breakfast" value={totals.day1Breakfast} total={registered} icon={<Coffee className="size-4 sm:size-5" />} color="emerald" />
-          <StatCard label="D1 Lunch" value={totals.day1Lunch} total={registered} icon={<Utensils className="size-4 sm:size-5" />} color="amber" />
-          <StatCard label="D2 Breakfast" value={totals.day2Breakfast} total={registered} icon={<Coffee className="size-4 sm:size-5" />} color="indigo" />
-          <StatCard label="D2 Lunch" value={totals.day2Lunch} total={registered} icon={<Utensils className="size-4 sm:size-5" />} color="rose" />
+          <StatCard label="D1 Participants" value={totals.day1Breakfast} total={registered} icon={<Coffee className="size-4 sm:size-5" />} color="emerald" />
+          <StatCard label="D1 Total Scans" value={totals.day1Lunch} icon={<Utensils className="size-4 sm:size-5" />} color="amber" />
+          <StatCard label="D2 Participants" value={totals.day2Breakfast} total={registered} icon={<Coffee className="size-4 sm:size-5" />} color="indigo" />
+          <StatCard label="D2 Total Scans" value={totals.day2Lunch} icon={<Utensils className="size-4 sm:size-5" />} color="rose" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
