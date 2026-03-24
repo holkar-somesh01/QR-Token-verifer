@@ -75,6 +75,12 @@ export default function UsersPage() {
   <li>This code is registered to <b>{expoId}</b>.</li>
   <li>Keep it safe - digital or printed copy works.</li>
 </ul>
+<div style="background-color: #fff0f0; border-left: 4px solid #ff3b30; padding: 12px; margin: 15px 0;">
+    <p style="color: #d32f2f; margin: 0; font-size: 14px; font-weight: bold;">
+        ⚠️ WARNING: Do not share this QR code with anyone. <br/>
+        It can only be scanned two times. If you share this, your meal will not be served to you!
+    </p>
+</div>
 <p>We look forward to seeing you at the event!</p>`;
 
     const [emailSubject, setEmailSubject] = useState(DEFAULT_SUBJECT);
@@ -213,13 +219,14 @@ export default function UsersPage() {
                 onlyUnsent
             }).unwrap();
             
-            const summary = `Bulk Distribution Outcome:\n✅ Sent: ${res.sent}\n❌ Failed: ${res.failed}${res.lastError ? `\n\nDiagnostic Error: ${res.lastError}` : ''}`;
-            toast.success("Bulk Distribution Executed.");
             refetch(); // Reload to see "Sent" status
             setIsEmailModalOpen(false);
             
             if (res.failed > 0) {
+                toast.error(`Sent: ${res.sent} | Failed: ${res.failed}\nError: ${res.lastError || 'Unknown Error'}`, { duration: 10000 });
                 console.error("Bulk partial failure:", res.lastError);
+            } else {
+                toast.success(`Successfully sent ${res.sent} emails!`);
             }
         } catch (err: any) {
             toast.error("Bulk Process Aborted: " + (err.data?.message || err.message));
@@ -332,6 +339,7 @@ export default function UsersPage() {
                                         </th>
                                         <th className="px-8 py-5">Personnel</th>
                                         <th className="px-8 py-5">Type / Class</th>
+                                        <th className="px-8 py-5">QR Status</th>
                                         <th className="px-8 py-5">Dispatch Status</th>
                                         <th className="px-8 py-5">Meals Consumed</th>
                                         <th className="px-8 py-5 text-right">Actions</th>
@@ -358,6 +366,11 @@ export default function UsersPage() {
                                             <td className="px-8 py-6">
                                                 <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter inline-block ${user.participantType === 'poster' ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>
                                                     {user.participantType}
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-6">
+                                                <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter inline-block ${user.qrCode ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400'}`}>
+                                                    {user.qrCode ? 'Generated' : 'Missing'}
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
@@ -406,7 +419,12 @@ export default function UsersPage() {
                                     <h3 className="font-bold text-slate-900 dark:text-white line-clamp-1">{user.name}</h3>
                                     <div className="flex flex-col mb-6">
                                         <p className="text-[10px] font-mono text-slate-400 uppercase">{user.expoId || 'no_id'}</p>
-                                        <p className="text-[10px] text-blue-500/70 font-medium lowercase truncate">{user.email || 'no email set'}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-[10px] text-blue-500/70 font-medium lowercase truncate">{user.email || 'no email set'}</p>
+                                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${user.qrCode ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400'}`}>
+                                                {user.qrCode ? 'QR OK' : 'NO QR'}
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="flex gap-2 mb-6">
                                         <MealPip status={user.mealStatus?.day1Breakfast} label="D1B" />
@@ -461,7 +479,7 @@ export default function UsersPage() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Expo Identifier</label>
-                                    <input required value={formData.expoId} onChange={e => setFormData({ ...formData, expoId: e.target.value })} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700" placeholder="EXPO-2026-X" />
+                                    <input value={formData.expoId} onChange={e => setFormData({ ...formData, expoId: e.target.value })} className="w-full px-5 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 text-sm font-bold outline-none text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-700" placeholder="(Auto-generated if empty)" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Allocation Type</label>

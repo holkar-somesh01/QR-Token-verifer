@@ -1,5 +1,5 @@
 const { db } = require('./db');
-const { users, mealStatus, scanLogs, volunteers, settings } = require('./db/schema');
+const { users, mealStatus, scanLogs, volunteers, settings, admins } = require('./db/schema');
 const { sql } = require('drizzle-orm');
 
 async function clearDB() {
@@ -17,6 +17,12 @@ async function clearDB() {
         
         await db.delete(volunteers);
         console.log("✓ Volunteers cleared.");
+
+        await db.delete(admins);
+        console.log("✓ Admins cleared.");
+
+        await db.delete(settings);
+        console.log("✓ Settings cleared.");
 
         // Optionally reset sequences for IDs
         await db.execute(sql`ALTER SEQUENCE users_id_seq RESTART WITH 1`);

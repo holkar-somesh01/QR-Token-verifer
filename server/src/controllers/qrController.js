@@ -76,11 +76,20 @@ const processImportData = async (data) => {
                 existing = await db.select().from(users).where(eq(users.email, email)).limit(1);
             }
 
+            let finalExpoId = expoId ? String(expoId) : null;
+            if (!finalExpoId || finalExpoId.trim() === '') {
+                if (existing.length > 0 && existing[0].expoId) {
+                    finalExpoId = existing[0].expoId;
+                } else {
+                    finalExpoId = `EXPO-${Math.floor(10000 + Math.random() * 90000)}`;
+                }
+            }
+
             const userData = {
                 name: name,
                 email: email || null,
                 mobile: mobile || null,
-                expoId: expoId || null,
+                expoId: finalExpoId,
                 participantType: participantType,
             };
 
@@ -531,15 +540,15 @@ exports.sendBulkQRViaEmail = async (req, res) => {
         const transporter = getTransporter();
         let lastError = null;
 
-        // Grouping logic: Process in chunks of 50 for large datasets (e.g., 1000 users)
-        const chunkSize = 50;
+        // Grouping logic: Process in chunks of 15 for large datasets sequentially to respect SMTP limits
+        const chunkSize = 15;
         for (let i = 0; i < targetUsers.length; i += chunkSize) {
             const chunk = targetUsers.slice(i, i + chunkSize);
             console.log(`[BULK] PROCESING BATCH ${Math.floor(i / chunkSize) + 1}/${Math.ceil(targetUsers.length/chunkSize)} (${chunk.length} participants)`);
 
-            // Send batch concurrently to be faster but stable
             const baseUrl = process.env.APP_URL || 'http://localhost:3000';
-            await Promise.all(chunk.map(async (user) => {
+            // Send sequentially to prevent concurrent connection drops (421 4.3.0)
+            for (const user of chunk) {
                 try {
                     const qrValue = `${baseUrl}/scan/${user.id}`;
                     const qrBuffer = await QRCode.toBuffer(qrValue);
@@ -583,18 +592,20 @@ exports.sendBulkQRViaEmail = async (req, res) => {
                     await db.update(users).set({ emailSent: 'yes' }).where(eq(users.id, user.id));
                     
                     results.sent++;
+                    // Short pause between individual emails
+                    await new Promise(res => setTimeout(res, 200));
                 } catch (err) {
                     console.error(`[BULK ERROR] ${user.email}:`, err.message);
                     lastError = err.message;
                     results.failed++;
                 }
-            }));
+            }
 
             console.log(`[BULK PROGRESS] Sent ${results.sent} of ${targetUsers.length} total.`);
 
-            // Pause between batches to avoid throttle/spam limits (500ms)
+            // Pause between batches to avoid throttle/spam limits (1.5s)
             if (i + chunkSize < targetUsers.length) {
-                await new Promise(res => setTimeout(res, 500));
+                await new Promise(res => setTimeout(res, 1500));
             }
         }
 
@@ -640,10 +651,15 @@ exports.createUser = async (req, res) => {
     try {
         const { name, email, mobile, expoId, participantType, mealStatus: mealState } = req.body;
 
+        let finalExpoId = expoId;
+        if (!finalExpoId || finalExpoId.trim() === '') {
+            finalExpoId = `EXPO-${Math.floor(10000 + Math.random() * 90000)}`;
+        }
+
         // Transaction for consistency
         await db.transaction(async (tx) => {
             const inserted = await tx.insert(users).values({
-                name, email, mobile, expoId,
+                name, email, mobile, expoId: finalExpoId,
                 participantType: participantType || 'normal',
                 status: req.body.status || 'active'
             }).returning({ id: users.id });
@@ -689,9 +705,19 @@ exports.updateUser = async (req, res) => {
         const userId = Number(id);
 
         await db.transaction(async (tx) => {
+            let finalExpoId = expoId;
+            if (!finalExpoId || finalExpoId.trim() === '') {
+                const existing = await tx.select().from(users).where(eq(users.id, userId)).limit(1).then(r => r[0]);
+                if (existing && existing.expoId) {
+                    finalExpoId = existing.expoId;
+                } else {
+                    finalExpoId = `EXPO-${Math.floor(10000 + Math.random() * 90000)}`;
+                }
+            }
+
             // Update Core User Info
             await tx.update(users).set({
-                name, email, mobile, expoId, participantType,
+                name, email, mobile, expoId: finalExpoId, participantType,
                 status: req.body.status
             }).where(eq(users.id, userId));
 
