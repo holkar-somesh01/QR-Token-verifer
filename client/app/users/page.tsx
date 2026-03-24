@@ -62,7 +62,9 @@ export default function UsersPage() {
     const [eventSettings, setEventSettings] = useState({
         EVENT_START_DATE: '',
         EVENT_END_DATE: '',
-        SCAN_CAPACITY: '10'
+        SCAN_CAPACITY: '10',
+        SMTP_EMAIL: '',
+        SMTP_PASSWORD: ''
     });
 
     // Default professional template
@@ -96,7 +98,9 @@ export default function UsersPage() {
             setEventSettings({
                 EVENT_START_DATE: dbSettings.EVENT_START_DATE || '',
                 EVENT_END_DATE: dbSettings.EVENT_END_DATE || '',
-                SCAN_CAPACITY: dbSettings.SCAN_CAPACITY || '10'
+                SCAN_CAPACITY: dbSettings.SCAN_CAPACITY || '10',
+                SMTP_EMAIL: dbSettings.SMTP_EMAIL || '',
+                SMTP_PASSWORD: dbSettings.SMTP_PASSWORD || ''
             });
         }
     }, [dbSettings]);
@@ -729,6 +733,33 @@ export default function UsersPage() {
                                     placeholder="e.g. 10"
                                 />
                                 <p className="text-[9px] text-slate-400 opacity-60">Number of scans allowed per participant per day.</p>
+                            </div>
+
+                            <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-800">
+                                <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mt-4 mb-4">Email Dispatch Credentials</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sender Email</label>
+                                        <input
+                                            type="email"
+                                            value={eventSettings.SMTP_EMAIL || ''}
+                                            onChange={e => setEventSettings({ ...eventSettings, SMTP_EMAIL: e.target.value })}
+                                            className="w-full px-5 py-3 rounded-xl bg-slate-100 dark:bg-slate-950 border border-transparent focus:border-blue-500 text-sm font-bold outline-none"
+                                            placeholder="your@gmail.com"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">App Password</label>
+                                        <input
+                                            type="password"
+                                            value={eventSettings.SMTP_PASSWORD || ''}
+                                            onChange={e => setEventSettings({ ...eventSettings, SMTP_PASSWORD: e.target.value })}
+                                            className="w-full px-5 py-3 rounded-xl bg-slate-100 dark:bg-slate-950 border border-transparent focus:border-blue-500 text-sm font-bold outline-none"
+                                            placeholder="xxxx xxxx xxxx xxxx"
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-[9px] text-slate-400 opacity-60 mt-3 flex items-center gap-1.5"><Mail size={12}/> Defaults to server environment credentials if left empty.</p>
                             </div>
 
                             <div className="pt-4 flex gap-3">

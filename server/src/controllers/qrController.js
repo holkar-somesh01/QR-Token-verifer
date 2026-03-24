@@ -113,11 +113,14 @@ const processImportData = async (data) => {
 };
 
 // Helper to get transporter
-const getTransporter = () => {
-    if (!process.env.FROM_EMAIL || !process.env.EMAIL_PASS) {
-        throw new Error("Email credentials missing in environment variables.");
+const getTransporter = async () => {
+    const smtpEmail = await getSetting('SMTP_EMAIL', process.env.FROM_EMAIL);
+    const smtpPass = await getSetting('SMTP_PASSWORD', process.env.EMAIL_PASS);
+
+    if (!smtpEmail || !smtpPass) {
+        throw new Error("Email credentials missing in both database and environment variables.");
     }
-    return nodemailer.createTransport({
+    const transporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 465,
         secure: true,
@@ -125,10 +128,11 @@ const getTransporter = () => {
         maxConnections: 20,
         maxMessages: 500,
         auth: {
-            user: process.env.FROM_EMAIL,
-            pass: process.env.EMAIL_PASS
+            user: smtpEmail,
+            pass: smtpPass
         }
     });
+    return { transporter, smtpEmail };
 };
 
 // Generate a secure random token
@@ -478,9 +482,9 @@ exports.sendQRViaEmail = async (req, res) => {
         const finalSubject = (subject || 'Your Food Access QR Code').replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
         const finalBody = (body || `<h2>Hello {name},</h2><p>Your meal QR code is attached.</p>`).replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
 
-        const transporter = getTransporter();
+        const { transporter, smtpEmail } = await getTransporter();
         await transporter.sendMail({
-            from: process.env.FROM_EMAIL,
+            from: smtpEmail,
             to: user.email,
             subject: finalSubject,
             html: `
@@ -537,7 +541,7 @@ exports.sendBulkQRViaEmail = async (req, res) => {
         }
 
         const results = { sent: 0, failed: 0 };
-        const transporter = getTransporter();
+        const { transporter, smtpEmail } = await getTransporter();
         let lastError = null;
 
         // Grouping logic: Process in chunks of 15 for large datasets sequentially to respect SMTP limits
@@ -557,7 +561,7 @@ exports.sendBulkQRViaEmail = async (req, res) => {
                     const finalBody = (body || `<h2>Hello {name},</h2><p>Your meal QR code is attached.</p>`).replace(/{name}/g, user.name).replace(/{expoId}/g, user.expoId || user.id);
 
                     await transporter.sendMail({
-                        from: process.env.FROM_EMAIL,
+                        from: smtpEmail,
                         to: user.email,
                         subject: finalSubject,
                         html: `
@@ -782,6 +786,8 @@ exports.getSettings = async (req, res) => {
         if (!settingsMap['EVENT_START_DATE']) settingsMap['EVENT_START_DATE'] = '2026-03-20';
         if (!settingsMap['EVENT_END_DATE']) settingsMap['EVENT_END_DATE'] = '2026-03-25';
         if (!settingsMap['SCAN_CAPACITY']) settingsMap['SCAN_CAPACITY'] = '10';
+        if (!settingsMap['SMTP_EMAIL']) settingsMap['SMTP_EMAIL'] = '';
+        if (!settingsMap['SMTP_PASSWORD']) settingsMap['SMTP_PASSWORD'] = '';
 
         res.json(settingsMap);
     } catch (err) {
