@@ -218,16 +218,16 @@ export default function UsersPage() {
     const handleSendBulk = async () => {
         if (!confirm(`Distribute QR Codes to ${selectedUsers.length > 0 ? selectedUsers.length : (onlyUnsent ? 'UNSENT ONLY' : 'ALL')} participants via email?`)) return;
         try {
-            const res = await sendBulkEmails({ 
+            const res = await sendBulkEmails({
                 userIds: selectedUsers.length > 0 ? selectedUsers : 'all',
                 subject: emailSubject,
                 body: emailBody,
                 onlyUnsent
             }).unwrap();
-            
+
             refetch(); // Reload to see "Sent" status
             setIsEmailModalOpen(false);
-            
+
             if (res.failed > 0) {
                 toast.error(`Sent: ${res.sent} | Failed: ${res.failed}\nError: ${res.lastError || 'Unknown Error'}`, { duration: 10000 });
                 console.error("Bulk partial failure:", res.lastError);
@@ -312,11 +312,11 @@ export default function UsersPage() {
                         <button onClick={() => handleGenerateQR(selectedUsers.length > 0 ? selectedUsers : 'all')} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-blue-600 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg shadow-blue-500/20">
                             <QrCode size={12} className="sm:size-[14px]" /> <span className="truncate">Issue QR</span>
                         </button>
-                        <button 
-                            onClick={() => setIsEmailModalOpen(true)} 
+                        <button
+                            onClick={() => setIsEmailModalOpen(true)}
                             className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-slate-700 dark:text-slate-300"
                         >
-                            <Mail size={12} className="text-blue-500 sm:size-[14px]" /> 
+                            <Mail size={12} className="text-blue-500 sm:size-[14px]" />
                             <span className="truncate">Invites</span>
                         </button>
                         <button onClick={() => setIsSettingsModalOpen(true)} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 hover:text-blue-500 transition-all" title="System Settings">
@@ -406,17 +406,17 @@ export default function UsersPage() {
                                                         {user.status === 'locked' ? <XCircle size={14} /> : <CheckCircle size={14} />}
                                                     </button>
                                                     <button
-                                                         onClick={async () => { 
-                                                             if (confirm("Exclude this participant from future invites? (Mark as Sent)")) {
-                                                                 await updateUser({ id: user.id, ...user, emailSent: 'yes' }).unwrap();
-                                                                 refetch();
-                                                             }
-                                                         }}
-                                                         className={`p-2 rounded-lg transition-all ${user.emailSent === 'yes' ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'text-slate-300 hover:text-blue-500 hover:bg-slate-50'}`}
-                                                         title="Mark as Sent / Skip"
-                                                     >
-                                                         <CheckCircle size={14} />
-                                                     </button>
+                                                        onClick={async () => {
+                                                            if (confirm("Exclude this participant from future invites? (Mark as Sent)")) {
+                                                                await updateUser({ id: user.id, ...user, emailSent: 'yes' }).unwrap();
+                                                                refetch();
+                                                            }
+                                                        }}
+                                                        className={`p-2 rounded-lg transition-all ${user.emailSent === 'yes' ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'text-slate-300 hover:text-blue-500 hover:bg-slate-50'}`}
+                                                        title="Mark as Sent / Skip"
+                                                    >
+                                                        <CheckCircle size={14} />
+                                                    </button>
                                                     <button onClick={() => handleOpenEditUser(user)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-all"><Pencil size={14} /></button>
                                                     <button onClick={async () => { if (confirm("Delete?")) await deleteUser({ id: user.id }); refetch(); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all"><Trash2 size={14} /></button>
                                                 </div>
@@ -453,8 +453,8 @@ export default function UsersPage() {
                                     <div className="flex justify-between items-center pt-6 border-t border-slate-200 dark:border-slate-800">
                                         <button onClick={() => handleOpenEditUser(user)} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-500 transition-colors">Configure Access</button>
                                         <div className="flex gap-2">
-                                            <button 
-                                                onClick={async () => { if (confirm("Mark as Sent (Skip)?")) { await updateUser({ id: user.id, ...user, emailSent: 'yes' }).unwrap(); refetch(); }}} 
+                                            <button
+                                                onClick={async () => { if (confirm("Mark as Sent (Skip)?")) { await updateUser({ id: user.id, ...user, emailSent: 'yes' }).unwrap(); refetch(); } }}
                                                 className={`p-2 transition-all ${user.emailSent === 'yes' ? 'text-emerald-500' : 'text-slate-300 hover:text-emerald-400'}`}
                                                 title="Mark as Sent / Skip"
                                             >
@@ -532,20 +532,20 @@ export default function UsersPage() {
                                         </button>
                                     ))}
                                 </div>
-                             <div className="space-y-2">
-                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Dispatch Status</label>
-                                 <div className="flex gap-3 sm:gap-4">
-                                     {[
-                                         { id: 'no', label: 'Pending Dispatch', icon: Mail, color: 'blue' },
-                                         { id: 'yes', label: 'Mark as Sent/Skip', icon: CheckCircle, color: 'emerald' }
-                                     ].map(st => (
-                                         <button key={st.id} type="button" onClick={() => setFormData({ ...formData, emailSent: st.id })} className={`flex-1 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${formData.emailSent === st.id ? (st.id === 'no' ? 'bg-blue-600 text-white border-blue-600' : 'bg-emerald-600 text-white border-emerald-600') : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-slate-100 dark:border-slate-800'}`}>
-                                             <st.icon size={12} className="sm:size-[14px]" />
-                                             {st.label}
-                                         </button>
-                                     ))}
-                                 </div>
-                             </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Dispatch Status</label>
+                                    <div className="flex gap-3 sm:gap-4">
+                                        {[
+                                            { id: 'no', label: 'Pending Dispatch', icon: Mail, color: 'blue' },
+                                            { id: 'yes', label: 'Mark as Sent/Skip', icon: CheckCircle, color: 'emerald' }
+                                        ].map(st => (
+                                            <button key={st.id} type="button" onClick={() => setFormData({ ...formData, emailSent: st.id })} className={`flex-1 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${formData.emailSent === st.id ? (st.id === 'no' ? 'bg-blue-600 text-white border-blue-600' : 'bg-emerald-600 text-white border-emerald-600') : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-slate-100 dark:border-slate-800'}`}>
+                                                <st.icon size={12} className="sm:size-[14px]" />
+                                                {st.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="space-y-4">
@@ -695,12 +695,12 @@ export default function UsersPage() {
 
                             <div className="p-6 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30 flex items-center justify-between mb-8">
                                 <div className="flex items-center gap-3">
-                                    <input 
-                                        type="checkbox" 
+                                    <input
+                                        type="checkbox"
                                         id="onlyUnsent"
-                                        checked={onlyUnsent} 
-                                        onChange={() => setOnlyUnsent(!onlyUnsent)} 
-                                        className="h-4 w-4 text-blue-600 rounded cursor-pointer" 
+                                        checked={onlyUnsent}
+                                        onChange={() => setOnlyUnsent(!onlyUnsent)}
+                                        className="h-4 w-4 text-blue-600 rounded cursor-pointer"
                                     />
                                     <label htmlFor="onlyUnsent" className="cursor-pointer">
                                         <p className="text-[10px] font-black uppercase tracking-widest text-blue-700 dark:text-blue-400">Skip Registry Successes</p>
@@ -714,8 +714,8 @@ export default function UsersPage() {
                                     Dismiss
                                 </button>
                                 <button onClick={() => handleSendBulk()} disabled={isSendingBulk} className="order-1 sm:order-2 flex-[2] py-4 sm:py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-2">
-                                     {isSendingBulk ? <Loader2 className="animate-spin" size={14} /> : <Mail size={14} />}
-                                     {isSendingBulk ? 'Distributing...' : 'Execute Group Distribution'}
+                                    {isSendingBulk ? <Loader2 className="animate-spin" size={14} /> : <Mail size={14} />}
+                                    {isSendingBulk ? 'Distributing...' : 'Execute Group Distribution'}
                                 </button>
                             </div>
                         </div>
@@ -796,7 +796,7 @@ export default function UsersPage() {
                                         />
                                     </div>
                                 </div>
-                                <p className="text-[9px] text-slate-400 opacity-60 mt-3 flex items-center gap-1.5"><Mail size={12}/> Defaults to server environment credentials if left empty.</p>
+                                <p className="text-[9px] text-slate-400 opacity-60 mt-3 flex items-center gap-1.5"><Mail size={12} /> Defaults to server environment credentials if left empty.</p>
                             </div>
 
                             <div className="pt-4 flex gap-3">
