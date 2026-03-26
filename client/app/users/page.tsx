@@ -31,6 +31,7 @@ export default function UsersPage() {
         expoId: '',
         participantType: 'normal',
         status: 'active',
+        emailSent: 'no',
         mealStatus: {
             day1Breakfast: 'not_used',
             day1Lunch: 'not_used',
@@ -190,6 +191,7 @@ export default function UsersPage() {
             expoId: user.expoId || '',
             participantType: user.participantType || 'normal',
             status: user.status || 'active',
+            emailSent: user.emailSent || 'no',
             mealStatus: user.mealStatus || {
                 day1Breakfast: 'not_used',
                 day1Lunch: 'not_used',
@@ -298,7 +300,7 @@ export default function UsersPage() {
 
                 <div className="flex flex-col xl:flex-row gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-[2rem] sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl">
                     <div className="grid grid-cols-2 lg:flex gap-2 sm:gap-3 w-full xl:w-auto">
-                        <button onClick={() => { setEditingUser(null); setFormData({ name: '', email: '', expoId: '', participantType: 'normal', status: 'active', mealStatus: { day1Breakfast: 'not_used', day1Lunch: 'not_used', day2Breakfast: 'not_used', day2Lunch: 'not_used' } }); setIsUserModalOpen(true); }} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-slate-900 dark:bg-slate-800 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-1.5 sm:gap-2">
+                        <button onClick={() => { setEditingUser(null); setFormData({ name: '', email: '', expoId: '', participantType: 'normal', status: 'active', emailSent: 'no', mealStatus: { day1Breakfast: 'not_used', day1Lunch: 'not_used', day2Breakfast: 'not_used', day2Lunch: 'not_used' } }); setIsUserModalOpen(true); }} className="px-3 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-slate-900 dark:bg-slate-800 text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-1.5 sm:gap-2">
                             <Plus size={12} className="sm:size-[14px]" /> <span className="truncate">Add User</span>
                         </button>
                         <button onClick={() => refetch()} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 hover:text-blue-500 transition-all hover:rotate-180 duration-500" title="Refresh User List">
@@ -403,6 +405,18 @@ export default function UsersPage() {
                                                     >
                                                         {user.status === 'locked' ? <XCircle size={14} /> : <CheckCircle size={14} />}
                                                     </button>
+                                                    <button
+                                                         onClick={async () => { 
+                                                             if (confirm("Exclude this participant from future invites? (Mark as Sent)")) {
+                                                                 await updateUser({ id: user.id, ...user, emailSent: 'yes' }).unwrap();
+                                                                 refetch();
+                                                             }
+                                                         }}
+                                                         className={`p-2 rounded-lg transition-all ${user.emailSent === 'yes' ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : 'text-slate-300 hover:text-blue-500 hover:bg-slate-50'}`}
+                                                         title="Mark as Sent / Skip"
+                                                     >
+                                                         <CheckCircle size={14} />
+                                                     </button>
                                                     <button onClick={() => handleOpenEditUser(user)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-all"><Pencil size={14} /></button>
                                                     <button onClick={async () => { if (confirm("Delete?")) await deleteUser({ id: user.id }); refetch(); }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all"><Trash2 size={14} /></button>
                                                 </div>
@@ -438,7 +452,16 @@ export default function UsersPage() {
                                     </div>
                                     <div className="flex justify-between items-center pt-6 border-t border-slate-200 dark:border-slate-800">
                                         <button onClick={() => handleOpenEditUser(user)} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-500 transition-colors">Configure Access</button>
-                                        <button onClick={() => handleSendEmail(user.id)} className="p-2 text-slate-300 hover:text-blue-500"><Mail size={16} /></button>
+                                        <div className="flex gap-2">
+                                            <button 
+                                                onClick={async () => { if (confirm("Mark as Sent (Skip)?")) { await updateUser({ id: user.id, ...user, emailSent: 'yes' }).unwrap(); refetch(); }}} 
+                                                className={`p-2 transition-all ${user.emailSent === 'yes' ? 'text-emerald-500' : 'text-slate-300 hover:text-emerald-400'}`}
+                                                title="Mark as Sent / Skip"
+                                            >
+                                                <CheckCircle size={16} />
+                                            </button>
+                                            <button onClick={() => handleSendEmail(user.id)} className="p-2 text-slate-300 hover:text-blue-500"><Mail size={16} /></button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -509,6 +532,20 @@ export default function UsersPage() {
                                         </button>
                                     ))}
                                 </div>
+                             <div className="space-y-2">
+                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Dispatch Status</label>
+                                 <div className="flex gap-3 sm:gap-4">
+                                     {[
+                                         { id: 'no', label: 'Pending Dispatch', icon: Mail, color: 'blue' },
+                                         { id: 'yes', label: 'Mark as Sent/Skip', icon: CheckCircle, color: 'emerald' }
+                                     ].map(st => (
+                                         <button key={st.id} type="button" onClick={() => setFormData({ ...formData, emailSent: st.id })} className={`flex-1 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${formData.emailSent === st.id ? (st.id === 'no' ? 'bg-blue-600 text-white border-blue-600' : 'bg-emerald-600 text-white border-emerald-600') : 'bg-slate-50 dark:bg-slate-950 text-slate-400 border-slate-100 dark:border-slate-800'}`}>
+                                             <st.icon size={12} className="sm:size-[14px]" />
+                                             {st.label}
+                                         </button>
+                                     ))}
+                                 </div>
+                             </div>
                             </div>
 
                             <div className="space-y-4">

@@ -274,6 +274,7 @@ exports.scanQRCode = async (req, res) => {
             return res.status(400).json({ error: 'Invalid or missing User ID/Token' });
         }
 
+        let countInfo = { current: 0, max: 0 };
         // Concurrent scan prevention: Use a transaction or select for update
         await db.transaction(async (tx) => {
             const userRecord = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
@@ -307,7 +308,7 @@ exports.scanQRCode = async (req, res) => {
                     sql`DATE(${scanLogs.scanTime}) = ${currentDate}`
                 ));
             
-            const todayScanCount = dailyScansRecord[0].count;
+            const todayScanCount = Number(dailyScansRecord[0].count);
 
             if (todayScanCount >= dailyScanLimit) {
                 throw new Error(`ACCESS DENIED: Daily limit of ${dailyScanLimit} scans reached for today.`);
@@ -326,11 +327,13 @@ exports.scanQRCode = async (req, res) => {
                 mealType: mealLabel,
                 scannedBy: scannedBy || 'volunteer'
             });
+
+            countInfo = { current: todayScanCount + 1, max: dailyScanLimit };
         });
 
         res.json({
             valid: true,
-            message: 'Meal Approved'
+            message: `Meal Approved (Scan ${countInfo.current} of ${countInfo.max})`
         });
 
     } catch (error) {
@@ -342,35 +345,57 @@ exports.scanQRCode = async (req, res) => {
 // Fetch Stats
 exports.getStats = async (req, res) => {
     try {
-        const startDate = await getSetting('EVENT_START_DATE', '2026-03-20');
-        const day2Date = new Date(startDate);
-        day2Date.setDate(day2Date.getDate() + 1);
-        const day2Str = day2Date.toISOString().split('T')[0];
+        let startDate = await getSetting('EVENT_START_DATE', '2026-03-20');
+        
+        // Find actual dates with scans to make dashboard dynamic if settings are off
+        const actualDatesRes = await db.execute(sql`SELECT DISTINCT DATE(${scanLogs.scanTime}) as scan_date FROM ${scanLogs} ORDER BY scan_date ASC`);
+        const actualDates = actualDatesRes.rows.map(r => r.scan_date);
+
+        let d1Date = startDate;
+        let d2Str = null;
+
+        if (actualDates.length > 0) {
+            // If the set startDate has no scans, but we have scans elsewhere, maybe help the user by using actual dates?
+            // Actually, let's stick to settings if they exist, but if Day 1 is 0 and we have scans, it's confusing.
+            // Let's use the first available scan date if startDate in settings has NO scans.
+            const d1HasScans = await db.select({ count: count() }).from(scanLogs).where(sql`DATE(${scanLogs.scanTime}) = ${startDate}`).then(r => Number(r[0].count) > 0);
+            
+            if (!d1HasScans && actualDates.length > 0) {
+                d1Date = actualDates[0];
+            }
+        }
+
+        const day2DateObj = new Date(d1Date);
+        day2DateObj.setDate(day2DateObj.getDate() + 1);
+        d2Str = day2DateObj.toISOString().split('T')[0];
 
         // 1. Total Registered
         const totalUsers = await db.select({ count: count() }).from(users);
         const registered = Number(totalUsers[0].count);
 
-        // 2. Day 1 Scans
+        // 2. Day 1 Scans (Unique Participants & Total Scans)
         const d1Scans = await db.select({ count: sql`count(distinct ${scanLogs.userId})` })
             .from(scanLogs)
-            .where(sql`DATE(${scanLogs.scanTime}) = ${startDate}`);
+            .where(sql`DATE(${scanLogs.scanTime}) = ${d1Date}`);
         const d1Total = await db.select({ count: count() })
             .from(scanLogs)
-            .where(sql`DATE(${scanLogs.scanTime}) = ${startDate}`);
-
+            .where(sql`DATE(${scanLogs.scanTime}) = ${d1Date}`);
+        
         // 3. Day 2 Scans
         const d2Scans = await db.select({ count: sql`count(distinct ${scanLogs.userId})` })
             .from(scanLogs)
-            .where(sql`DATE(${scanLogs.scanTime}) = ${day2Str}`);
+            .where(sql`DATE(${scanLogs.scanTime}) = ${d2Str}`);
         const d2Total = await db.select({ count: count() })
             .from(scanLogs)
-            .where(sql`DATE(${scanLogs.scanTime}) = ${day2Str}`);
+            .where(sql`DATE(${scanLogs.scanTime}) = ${d2Str}`);
 
         const d1Count = Number(d1Scans[0].count);
         const d1TotalCount = Number(d1Total[0].count);
         const d2Count = Number(d2Scans[0].count);
         const d2TotalCount = Number(d2Total[0].count);
+
+        // Convert dates to strings for response if needed (optional)
+        const d1Str = typeof d1Date === 'string' ? d1Date : d1Date?.toISOString?.().split('T')[0] || String(d1Date);
 
         // 4. Fetch Recent Scans
         const recentScans = await db.select({
@@ -388,10 +413,12 @@ exports.getStats = async (req, res) => {
         res.json({
             stats: {
                 totalRegistered: registered,
-                day1Breakfast: d1Count, 
-                day1Lunch: d1TotalCount,
-                day2Breakfast: d2Count, 
-                day2Lunch: d2TotalCount
+                day1Participants: d1Count, 
+                day1TotalScans: d1TotalCount,
+                day2Participants: d2Count, 
+                day2TotalScans: d2TotalCount,
+                day1Date: d1Str,
+                day2Date: d2Str
             },
             recentScans
         });
@@ -665,7 +692,8 @@ exports.createUser = async (req, res) => {
             const inserted = await tx.insert(users).values({
                 name, email, mobile, expoId: finalExpoId,
                 participantType: participantType || 'normal',
-                status: req.body.status || 'active'
+                status: req.body.status || 'active',
+                emailSent: req.body.emailSent || 'no'
             }).returning({ id: users.id });
 
             const userId = inserted[0].id;
@@ -722,7 +750,8 @@ exports.updateUser = async (req, res) => {
             // Update Core User Info
             await tx.update(users).set({
                 name, email, mobile, expoId: finalExpoId, participantType,
-                status: req.body.status
+                status: req.body.status,
+                emailSent: req.body.emailSent
             }).where(eq(users.id, userId));
 
             // Update Meal Status if provided

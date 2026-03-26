@@ -1,6 +1,6 @@
 "use client";
 import { signOut, useSession } from "next-auth/react";
-import { LogOut, User, Menu, X, QrCode, Clock } from "lucide-react";
+import { LogOut, User, Menu, X, QrCode, Clock, Settings } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -32,6 +32,9 @@ export default function Navbar() {
                         </Link>
                         <Link href="/attendance" className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white transition-all">
                             Scan History
+                        </Link>
+                        <Link href="/settings" className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white transition-all">
+                            Settings
                         </Link>
                     </div>
                 </div>
@@ -90,6 +93,9 @@ export default function Navbar() {
                             </Link>
                             <Link onClick={() => setMobileMenuOpen(false)} href="/attendance" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
                                 <Clock size={18} /> Audit Ledger
+                            </Link>
+                            <Link onClick={() => setMobileMenuOpen(false)} href="/settings" className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all">
+                                <Settings size={18} /> Settings
                             </Link>
                         </div>
                         <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
