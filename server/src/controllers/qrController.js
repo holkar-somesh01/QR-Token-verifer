@@ -1,6 +1,6 @@
 const { db } = require('../../db');
 const { users, mealStatus, scanLogs, volunteers, settings } = require('../../db/schema');
-const { eq, and, isNull, desc, inArray, sql, count } = require('drizzle-orm');
+const { eq, and, or, isNull, desc, inArray, sql, count } = require('drizzle-orm');
 const crypto = require('crypto');
 const XLSX = require('xlsx');
 const fs = require('fs');
@@ -226,15 +226,21 @@ exports.getQRDetails = async (req, res) => {
         const today = new Date().toISOString().split('T')[0];
         const currentDate = req.query.date || today;
 
-        // Count scans for this specific user on "currentDate"
+        // Count scans: Match against new scanDate column OR legacy scanTime (if scanDate is null)
         const dailyScansRecord = await db.select({ count: count() })
             .from(scanLogs)
             .where(and(
                 eq(scanLogs.userId, user.id),
-                sql`DATE(${scanLogs.scanTime}) = ${currentDate}`
+                or(
+                    eq(scanLogs.scanDate, currentDate),
+                    and(
+                        isNull(scanLogs.scanDate),
+                        sql`DATE(${scanLogs.scanTime}) = ${currentDate}`
+                    )
+                )
             ));
         
-        const todayScanCount = dailyScansRecord[0].count;
+        const todayScanCount = Number(dailyScansRecord[0].count);
         const totalScanCount = user.totalScans || 0;
 
         console.log(`[Diagnostic] User: ${user.name}, Date: ${currentDate}, Daily Scans: ${todayScanCount}/${dailyScanLimit}`);
@@ -275,21 +281,21 @@ exports.scanQRCode = async (req, res) => {
         }
 
         let countInfo = { current: 0, max: 0 };
-        // Concurrent scan prevention: Use a transaction or select for update
+        // Concurrent scan prevention: Use a transaction and select for update
         await db.transaction(async (tx) => {
-            const userRecord = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
-            if (!userRecord.length) {
+            const userRecord = await tx.execute(sql`SELECT * FROM users WHERE id = ${userId} FOR UPDATE`);
+            if (!userRecord.rows.length) {
                 throw new Error('User not found');
             }
 
-            const user = userRecord[0];
+            const user = userRecord.rows[0];
             if (user.status === 'locked') {
                 throw new Error('Token is Locked/Disabled');
             }
 
             const startDate = await getSetting('EVENT_START_DATE', '2026-03-20');
-            const endDate = await getSetting('EVENT_END_DATE', '2026-03-25');
-            const scanCapacityConfig = await getSetting('SCAN_CAPACITY', '10');
+            const endDate = await getSetting('EVENT_END_DATE', '2026-03-30');
+            const scanCapacityConfig = await getSetting('SCAN_CAPACITY', '2');
             const dailyScanLimit = parseInt(scanCapacityConfig);
 
             // 1. Date Validation
@@ -300,12 +306,18 @@ exports.scanQRCode = async (req, res) => {
                 throw new Error(`STRICT BLOCK: QR is only valid from ${startDate} to ${endDate}. (Current: ${currentDate})`);
             }
 
-            // 2. Daily Capacity Validation
+            // 2. Daily Capacity Validation (Handles legacy records with NULL scanDate)
             const dailyScansRecord = await tx.select({ count: count() })
                 .from(scanLogs)
                 .where(and(
                     eq(scanLogs.userId, userId),
-                    sql`DATE(${scanLogs.scanTime}) = ${currentDate}`
+                    or(
+                        eq(scanLogs.scanDate, currentDate),
+                        and(
+                            isNull(scanLogs.scanDate),
+                            sql`DATE(${scanLogs.scanTime}) = ${currentDate}`
+                        )
+                    )
                 ));
             
             const todayScanCount = Number(dailyScansRecord[0].count);
@@ -319,12 +331,13 @@ exports.scanQRCode = async (req, res) => {
                 totalScans: (user.totalScans || 0) + 1
             }).where(eq(users.id, userId));
 
-            // Log scan with dynamic label
-            const mealLabel = `Meal Scan #${todayScanCount + 1} (Date: ${currentDate})`;
+            // Log scan with explicit date for limit checking
+            const mealLabel = `Scan #${todayScanCount + 1} (${currentDate})`;
             await tx.insert(scanLogs).values({
                 userId: userId,
                 scanNumber: todayScanCount + 1,
                 mealType: mealLabel,
+                scanDate: currentDate,
                 scannedBy: scannedBy || 'volunteer'
             });
 

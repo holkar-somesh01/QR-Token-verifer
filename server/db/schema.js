@@ -33,6 +33,7 @@ const scanLogs = pgTable('scan_logs', {
     scanNumber: integer('scan_number').notNull(),
     mealType: text('meal_type').notNull(), // 'Day1 Breakfast', etc.
     scanTime: timestamp('scan_time').defaultNow(),
+    scanDate: text('scan_date'), // Store YYYY-MM-DD for reliable daily limit checks
     scannedBy: text('scanned_by'), // Volunteer ID or name
 });
 

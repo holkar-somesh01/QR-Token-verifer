@@ -28,7 +28,7 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
 export const apiSlice = createApi({
     reducerPath: 'api',
     baseQuery: baseQueryWithReauth,
-    tagTypes: ['Stats', 'Users', 'Settings'],
+    tagTypes: ['Stats', 'Users', 'Settings', 'QRDetails'],
     endpoints: (builder) => ({
         getStats: builder.query<any, void>({
             query: () => '/qr/stats', // Updated to new stats endpoint
@@ -53,7 +53,10 @@ export const apiSlice = createApi({
                 method: 'POST',
                 body: { token: body.hash || body.token, ...body }, // Map hash to token if needed
             }),
-            invalidatesTags: ['Stats'],
+            invalidatesTags: (result, error, { hash, token }) => [
+                'Stats',
+                { type: 'QRDetails', id: hash || token }
+            ],
         }),
         sendBulkEmails: builder.mutation<any, { userIds: string[] | 'all', subject?: string, body?: string, onlyUnsent?: boolean }>({
             query: (body) => ({
@@ -74,6 +77,7 @@ export const apiSlice = createApi({
         }),
         getQRDetails: builder.query<any, { token: string, date?: string }>({
             query: ({ token, date }) => `/qr/details/${token}${date ? `?date=${date}` : ''}`,
+            providesTags: (result, error, { token }) => [{ type: 'QRDetails', id: token }],
         }),
         importUsers: builder.mutation<any, FormData>({
             query: (body) => ({
